@@ -20,8 +20,8 @@ while ($row = $result->fetch_assoc()) {
 }
 
 // Construir consulta
-$fields = implode(', ', $campos);
-$sql = "SELECT id, $fields FROM `$tabla`";
+$fields = empty($campos) ? '*' : 'id, ' . implode(', ', $campos);
+$sql = "SELECT $fields FROM `$tabla`";
 
 if ($search !== "") {
     $whereParts = [];
@@ -34,15 +34,17 @@ if ($search !== "") {
         $types .= "s";
     }
     
-    $sql .= " WHERE " . implode(" OR ", $whereParts);
+    if (!empty($whereParts)) {
+        $sql .= " WHERE " . implode(" OR ", $whereParts);
+    }
 }
 
 // Contar total
 $countSql = "SELECT COUNT(*) as total FROM `$tabla`" . 
-            (isset($whereParts) ? " WHERE " . implode(" OR ", $whereParts) : "");
+            (!empty($whereParts) ? " WHERE " . implode(" OR ", $whereParts) : "");
 
 $stmt = $conn->prepare($countSql);
-if (isset($params)) {
+if (!empty($params)) {
     $stmt->bind_param($types, ...$params);
 }
 $stmt->execute();
@@ -52,7 +54,7 @@ $total = $stmt->get_result()->fetch_assoc()['total'];
 $sql .= " LIMIT ? OFFSET ?";
 $stmt = $conn->prepare($sql);
 
-if (isset($params)) {
+if (!empty($params)) {
     $params[] = $limit;
     $params[] = $offset;
     $types .= "ii";

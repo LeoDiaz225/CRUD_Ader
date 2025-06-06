@@ -413,50 +413,35 @@ if (manualForm) {
 const exportBtn = document.getElementById("exportExcelBtn");
 if (exportBtn) {
   exportBtn.addEventListener("click", function() {
-    // Pedimos todos los registros al backend (sin paginación)
-    fetch(`environments/read.php?tabla=${tabla}&page=1&limit=1000000`)
-      .then(res => res.json())
-      .then(response => {
-        const data = response.data;
-        if (!Array.isArray(data) || data.length === 0) {
-          alert("No hay datos para exportar.");
-          return;
-        }
+    // Obtener la tabla actual del DOM
+    const table = document.querySelector('table');
+    const thead = table.querySelector('thead');
+    const tbody = document.getElementById('userTableBody');
+    
+    // Crear una nueva tabla para exportar (sin columna de acciones)
+    const exportTable = document.createElement("table");
+    
+    // Copiar el encabezado pero sin la columna de acciones
+    const headerRow = thead.querySelector('tr');
+    const exportHeader = headerRow.cloneNode(true);
+    exportHeader.lastElementChild.remove(); // Eliminar columna de acciones
+    
+    const exportThead = document.createElement("thead");
+    exportThead.appendChild(exportHeader);
+    exportTable.appendChild(exportThead);
+    
+    // Copiar el cuerpo pero sin la columna de acciones
+    const exportTbody = document.createElement("tbody");
+    tbody.querySelectorAll('tr').forEach(row => {
+      const newRow = row.cloneNode(true);
+      newRow.lastElementChild.remove(); // Eliminar columna de acciones
+      exportTbody.appendChild(newRow);
+    });
+    exportTable.appendChild(exportTbody);
 
-        // Creamos una tabla HTML en memoria (sin columna Acciones)
-        const table = document.createElement("table");
-        const thead = document.createElement("thead");
-        const headerRow = document.createElement("tr");
-        ["Apellido y Nombre", "CUIT o DNI", "Razón Social", "Teléfono", "Correo", "Rubro"].forEach(text => {
-          const th = document.createElement("th");
-          th.textContent = text;
-          headerRow.appendChild(th);
-        });
-        thead.appendChild(headerRow);
-        table.appendChild(thead);
-
-        const tbody = document.createElement("tbody");
-        data.forEach(user => {
-          const row = document.createElement("tr");
-          row.innerHTML = `
-            <td>${user.apellido_nombre || ''}</td>
-            <td>${user.cuit_dni || ''}</td>
-            <td>${user.razon_social || ''}</td>
-            <td>${user.telefono || ''}</td>
-            <td>${user.correo || ''}</td>
-            <td>${user.rubro || ''}</td>
-          `;
-          tbody.appendChild(row);
-        });
-        table.appendChild(tbody);
-
-        // Exportar usando XLSX
-        const wb = XLSX.utils.table_to_book(table, {sheet: "Registros"});
-        XLSX.writeFile(wb, `registros_${tabla}.xlsx`);
-      })
-      .catch(err => {
-        alert("Error al exportar: " + err.message);
-      });
+    // Exportar usando XLSX
+    const wb = XLSX.utils.table_to_book(exportTable, {sheet: "Registros"});
+    XLSX.writeFile(wb, `registros_${tabla}.xlsx`);
   });
 }
 
