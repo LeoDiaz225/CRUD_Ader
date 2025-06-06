@@ -176,7 +176,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_FILES['csvFile'])) {
       </div>
     </form>
     <p class="mt-2 mb-0" style="font-size: 0.95em; color: #ffc107;">
-      El CSV debe tener los campos: Apellido y Nombre, CUIT/DNI, Razón Social, Teléfono, Correo, Rubro.
+      El CSV debe tener los campos: <?php 
+    $campos_lista = array_map(function($campo) {
+        return htmlspecialchars($campo['nombre_campo']);
+    }, $campos);
+    echo implode(', ', $campos_lista);
+    ?>.
     </p>
   </div>
 </div>
