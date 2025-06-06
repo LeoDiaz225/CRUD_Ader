@@ -206,18 +206,49 @@ $result = $conn->query("SELECT * FROM entornos ORDER BY fecha_creacion DESC");
 
 <h1 class="text-center my-4">Gestión de Entornos</h1>
 
-<?php if ($_SESSION['puede_crear_entorno']) { ?>
-  <div class="row justify-content-center mb-4">
-    <div class="col-12 col-md-8 col-lg-6">
-      <form action="environments/create_environment.php" method="POST" class="card card-body shadow-sm bg-dark text-light border-0">
-        <div class="input-group">
-          <input type="text" name="nombre" class="form-control" placeholder="Nombre del entorno" required>
-          <button type="submit" class="btn btn-success">Crear Entorno</button>
-        </div>
-      </form>
+<?php if (isset($_SESSION['puede_crear_entorno']) && $_SESSION['puede_crear_entorno']): ?>
+<div class="modal fade" id="crearEntornoModal">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content bg-dark text-light">
+      <div class="modal-header border-0">
+        <h5 class="modal-title">Crear Nuevo Entorno</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="crearEntornoForm">
+          <div class="mb-3">
+            <label class="form-label">Nombre del entorno</label>
+            <input type="text" name="nombre" class="form-control" required>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label d-flex justify-content-between align-items-center">
+              <span>Campos de la tabla</span>
+              <button type="button" class="btn btn-sm btn-success" id="agregarCampo">
+                <i class="bi bi-plus-lg"></i> Agregar campo
+              </button>
+            </label>
+            <div id="camposContainer" class="border rounded p-3">
+              <!-- Los campos se agregarán aquí dinámicamente -->
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-success w-100">
+            <i class="bi bi-check-lg"></i> Crear entorno
+          </button>
+        </form>
+      </div>
     </div>
   </div>
-<?php } ?>
+</div>
+
+<!-- Agregar también el botón para abrir el modal -->
+<div class="text-center mb-4">
+  <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#crearEntornoModal">
+    <i class="bi bi-plus-lg"></i> Crear nuevo entorno
+  </button>
+</div>
+<?php endif; ?>
 
 <div class="row justify-content-center">
   <div class="col-12 col-md-10 col-lg-8">
@@ -298,6 +329,7 @@ $result = $conn->query("SELECT * FROM entornos ORDER BY fecha_creacion DESC");
 </div>
 
 <script src="js/script.js"></script>
+<script src="js/entorno-campos.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

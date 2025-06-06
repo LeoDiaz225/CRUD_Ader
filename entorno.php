@@ -29,6 +29,13 @@ if ($tableCheck->num_rows === 0) {
   die("<div class='container my-5'><div class='alert alert-danger'>Error: La tabla '$tabla' no existe.</div><a href='index.php' class='btn btn-link'><i class='bi bi-arrow-left'></i> Volver a entornos</a></div>");
 }
 
+// Al inicio del archivo, después de la conexión
+$stmt = $conn->prepare("SELECT * FROM entornos_campos 
+                       WHERE entorno_nombre = ? ORDER BY orden");
+$stmt->bind_param("s", $tabla);
+$stmt->execute();
+$campos = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
 // Guardar manualmente si es un formulario de carga manual (no CSV)
 if (
   $_SERVER["REQUEST_METHOD"] === "POST" && 
@@ -87,27 +94,35 @@ if (
   <div class="card mb-4 bg-dark text-light border-0">
     <div class="card-body">
       <h5 class="card-title text-center mb-3">Agregar registro manualmente</h5>
-      <form id="manualForm" autocomplete="off" class="row g-3">
-        <div class="col-md-6">
-          <input type="text" name="apellido_nombre" class="form-control" placeholder="Apellido y Nombre" required>
-        </div>
-        <div class="col-md-6">
-          <input type="text" name="cuit_dni" class="form-control" placeholder="CUIT o DNI" required>
-        </div>
-        <div class="col-md-6">
-          <input type="text" name="razon_social" class="form-control" placeholder="Razón Social" required>
-        </div>
-        <div class="col-md-6">
-          <input type="text" name="telefono" class="form-control" placeholder="Teléfono" required>
-        </div>
-        <div class="col-md-6">
-          <input type="email" name="correo" class="form-control" placeholder="Correo Electrónico" required>
-        </div>
-        <div class="col-md-6">
-          <input type="text" name="rubro" class="form-control" placeholder="Rubro" required>
-        </div>
-        <div class="col-12 text-end">
-          <button type="submit" class="btn btn-success"><i class="bi bi-save"></i> Guardar</button>
+      <form id="manualForm" class="row g-3">
+        <?php foreach ($campos as $campo): ?>
+            <div class="col-md-6">
+                <label class="form-label"><?= htmlspecialchars($campo['nombre_campo']) ?></label>
+                <?php if ($campo['tipo_campo'] === 'numero'): ?>
+                    <input type="number" 
+                           name="<?= htmlspecialchars($campo['nombre_campo']) ?>" 
+                           class="form-control"
+                           <?= $campo['es_requerido'] ? 'required' : '' ?>>
+                <?php elseif ($campo['tipo_campo'] === 'email'): ?>
+                    <input type="email" 
+                           name="<?= htmlspecialchars($campo['nombre_campo']) ?>" 
+                           class="form-control"
+                           <?= $campo['es_requerido'] ? 'required' : '' ?>>
+                <?php elseif ($campo['tipo_campo'] === 'fecha'): ?>
+                    <input type="date" 
+                           name="<?= htmlspecialchars($campo['nombre_campo']) ?>" 
+                           class="form-control"
+                           <?= $campo['es_requerido'] ? 'required' : '' ?>>
+                <?php else: ?>
+                    <input type="text" 
+                           name="<?= htmlspecialchars($campo['nombre_campo']) ?>" 
+                           class="form-control"
+                           <?= $campo['es_requerido'] ? 'required' : '' ?>>
+                <?php endif; ?>
+            </div>
+        <?php endforeach; ?>
+        <div class="col-12">
+            <button type="submit" class="btn btn-success">Guardar</button>
         </div>
       </form>
     </div>
@@ -149,33 +164,17 @@ if (
     <table class="table table-striped align-middle bg-dark text-light">
       <thead class="table-success">
         <tr>
-          <th>Apellido y Nombre</th>
-          <th>CUIT o DNI</th>
-          <th>Razón Social</th>
-          <th>Teléfono</th>
-          <th>Correo</th>
-          <th>Rubro</th>
-          <?php if (
-          (isset($_SESSION['puede_editar_registros']) && $_SESSION['puede_editar_registros']) ||
-          (isset($_SESSION['puede_eliminar_registros']) && $_SESSION['puede_eliminar_registros'])
-        ): ?>
+          <?php foreach ($campos as $campo): ?>
+              <th><?= htmlspecialchars($campo['nombre_campo']) ?></th>
+          <?php endforeach; ?>
           <th>Acciones</th>
-        <?php endif; ?>
-      </tr>
-    </thead>
-    <tbody id="userTableBody">
-      <tr>
-        <td colspan="<?=
-          6 + (
-            (isset($_SESSION['puede_editar_registros']) && $_SESSION['puede_editar_registros']) ||
-            (isset($_SESSION['puede_eliminar_registros']) && $_SESSION['puede_eliminar_registros'])
-            ? 1 : 0
-          )
-        ?>" class="text-center">Cargando datos...</td>
-      </tr>
-    </tbody>
-  </table>
-</div>
+        </tr>
+      </thead>
+      <tbody id="userTableBody">
+        <!-- Los datos se cargarán dinámicamente -->
+      </tbody>
+    </table>
+  </div>
   <div class="pagination-container d-flex justify-content-end">
     <div id="pagination-controls" class="mt-3"></div>
   </div>
