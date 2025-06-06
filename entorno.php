@@ -201,17 +201,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_FILES['csvFile'])) {
   <!-- Tabla de registros -->
   <div class="table-responsive">
     <table class="table table-striped align-middle bg-dark text-light">
-      <thead class="table-success">
-        <tr>
-          <?php foreach ($campos as $campo): ?>
-              <th><?= htmlspecialchars($campo['nombre_campo']) ?></th>
-          <?php endforeach; ?>
-          <th>Acciones</th>
-        </tr>
-      </thead>
-      <tbody id="userTableBody">
-        <!-- Los datos se cargarán dinámicamente -->
-      </tbody>
+        <thead class="table-success">
+            <tr>
+                <?php foreach ($campos as $campo): ?>
+                    <th><?= htmlspecialchars($campo['nombre_campo']) ?></th>
+                <?php endforeach; ?>
+                <?php if ($_SESSION['puede_editar_registros'] || $_SESSION['puede_eliminar_registros']): ?>
+                    <th>Acciones</th>
+                <?php endif; ?>
+            </tr>
+        </thead>
+        <tbody id="userTableBody">
+            <!-- Los datos se cargarán dinámicamente -->
+        </tbody>
     </table>
   </div>
   <div class="pagination-container d-flex justify-content-end">

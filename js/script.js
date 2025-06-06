@@ -153,50 +153,51 @@ if (csvForm) {
         }
 
 data.forEach(user => {
-  const row = document.createElement("tr");
-  row.setAttribute("data-id", user.id);
+    const row = document.createElement("tr");
+    row.setAttribute("data-id", user.id);
 
-  // Creamos las celdas para cada campo
-  Object.keys(user).forEach(key => {
-    if (key !== 'id') { // No mostrar el ID en la tabla
-      const td = document.createElement("td");
-      td.textContent = user[key] || '';
-      row.appendChild(td);
-    }
-  });
-
-  // Agregar columna de acciones si tiene permisos
-  if (puedeEditarRegistros || puedeEliminarRegistros) {
-    const tdAcciones = document.createElement("td");
-    if (puedeEditarRegistros) {
-      const btnEditar = document.createElement("button");
-      btnEditar.className = "btn btn-warning btn-sm edit-btn me-1";
-      btnEditar.innerHTML = '<i class="bi bi-pencil"></i> Editar';
-      btnEditar.setAttribute("data-bs-toggle", "modal");
-      btnEditar.setAttribute("data-bs-target", "#editModal");
-      btnEditar.setAttribute("data-id", user.id);
-      
-      // Agregar atributos data-* para cada campo
-      Object.keys(user).forEach(key => {
-        if (key !== 'id') {
-          btnEditar.setAttribute(`data-${key}`, user[key] || '');
+    // Creamos las celdas para cada campo
+    Object.keys(user).forEach(key => {
+        if (key !== 'id') { // No mostrar el ID en la tabla
+            const td = document.createElement("td");
+            td.textContent = user[key] || '';
+            row.appendChild(td);
         }
-      });
-      
-      tdAcciones.appendChild(btnEditar);
-    }
-    
-    if (puedeEliminarRegistros) {
-      const btnEliminar = document.createElement("button");
-      btnEliminar.className = "btn btn-danger btn-sm delete-btn";
-      btnEliminar.innerHTML = '<i class="bi bi-trash"></i> Eliminar';
-      tdAcciones.appendChild(btnEliminar);
-    }
-    
-    row.appendChild(tdAcciones);
-  }
+    });
 
-  userTableBody.appendChild(row);
+    // Agregar columna de acciones SOLO si tiene algún permiso
+    if (puedeEditarRegistros || puedeEliminarRegistros) {
+        const tdAcciones = document.createElement("td");
+        
+        if (puedeEditarRegistros) {
+            const btnEditar = document.createElement("button");
+            btnEditar.className = "btn btn-warning btn-sm edit-btn me-1";
+            btnEditar.innerHTML = '<i class="bi bi-pencil"></i> Editar';
+            btnEditar.setAttribute("data-bs-toggle", "modal");
+            btnEditar.setAttribute("data-bs-target", "#editModal");
+            btnEditar.setAttribute("data-id", user.id);
+            
+            // Agregar atributos data-* para cada campo
+            Object.keys(user).forEach(key => {
+                if (key !== 'id') {
+                    btnEditar.setAttribute(`data-${key}`, user[key] || '');
+                }
+            });
+            
+            tdAcciones.appendChild(btnEditar);
+        }
+        
+        if (puedeEliminarRegistros) {
+            const btnEliminar = document.createElement("button");
+            btnEliminar.className = "btn btn-danger btn-sm delete-btn";
+            btnEliminar.innerHTML = '<i class="bi bi-trash"></i> Eliminar';
+            tdAcciones.appendChild(btnEliminar);
+        }
+        
+        row.appendChild(tdAcciones);
+    }
+
+    userTableBody.appendChild(row);
 });
 
         // Activamos los botones de edición y eliminación
