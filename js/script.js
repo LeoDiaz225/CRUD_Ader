@@ -60,7 +60,7 @@ if (csvForm) {
       body: formData
     })
     .then(response => response.text())
-    .then(message => {
+    .then(message => { // Agregado .then para manejar el mensaje
       // Limpiamos el mensaje si contiene HTML
       const cleanMessage = message.replace(/<[^>]*>/g, '').trim();
       showFloatingMessage(cleanMessage);
@@ -156,48 +156,45 @@ data.forEach(user => {
   const row = document.createElement("tr");
   row.setAttribute("data-id", user.id);
 
-  // Creamos el contenido HTML de la fila
-  let actionsHtml = '';
-  if (puedeEditarRegistros) {
-    actionsHtml += `
-      <button 
-        type="button"
-        class="btn btn-warning btn-sm edit-btn"
-        data-id="${user.id}"
-        data-apellido_nombre="${user.apellido_nombre || ''}"
-        data-cuit_dni="${user.cuit_dni || ''}"
-        data-razon_social="${user.razon_social || ''}"
-        data-telefono="${user.telefono || ''}"
-        data-correo="${user.correo || ''}"
-        data-rubro="${user.rubro || ''}"
-        data-bs-toggle="modal"
-        data-bs-target="#editModal"
-      >
-        <i class="bi bi-pencil"></i> Editar
-      </button>
-    `;
-  }
-  if (puedeEliminarRegistros) {
-    actionsHtml += `
-      <button type="button" class="btn btn-danger btn-sm delete-btn">
-        <i class="bi bi-trash"></i> Eliminar
-      </button>
-    `;
-  }
+  // Creamos las celdas para cada campo
+  Object.keys(user).forEach(key => {
+    if (key !== 'id') { // No mostrar el ID en la tabla
+      const td = document.createElement("td");
+      td.textContent = user[key] || '';
+      row.appendChild(td);
+    }
+  });
 
-row.innerHTML = `
-  <td>${user.apellido_nombre || ''}</td>
-  <td>${user.cuit_dni || ''}</td>
-  <td>${user.razon_social || ''}</td>
-  <td>${user.telefono || ''}</td>
-  <td>${user.correo || ''}</td>
-  <td>${user.rubro || ''}</td>
-  ${
-    (puedeEditarRegistros || puedeEliminarRegistros)
-      ? `<td>${actionsHtml}</td>`
-      : ''
+  // Agregar columna de acciones si tiene permisos
+  if (puedeEditarRegistros || puedeEliminarRegistros) {
+    const tdAcciones = document.createElement("td");
+    if (puedeEditarRegistros) {
+      const btnEditar = document.createElement("button");
+      btnEditar.className = "btn btn-warning btn-sm edit-btn me-1";
+      btnEditar.innerHTML = '<i class="bi bi-pencil"></i> Editar';
+      btnEditar.setAttribute("data-bs-toggle", "modal");
+      btnEditar.setAttribute("data-bs-target", "#editModal");
+      btnEditar.setAttribute("data-id", user.id);
+      
+      // Agregar atributos data-* para cada campo
+      Object.keys(user).forEach(key => {
+        if (key !== 'id') {
+          btnEditar.setAttribute(`data-${key}`, user[key] || '');
+        }
+      });
+      
+      tdAcciones.appendChild(btnEditar);
+    }
+    
+    if (puedeEliminarRegistros) {
+      const btnEliminar = document.createElement("button");
+      btnEliminar.className = "btn btn-danger btn-sm delete-btn";
+      btnEliminar.innerHTML = '<i class="bi bi-trash"></i> Eliminar';
+      tdAcciones.appendChild(btnEliminar);
+    }
+    
+    row.appendChild(tdAcciones);
   }
-`;
 
   userTableBody.appendChild(row);
 });
@@ -312,13 +309,13 @@ function activarBotones() {
 // Nuevo handler para editar usando los atributos data-*
 function handleEdit() {
   document.getElementById("edit_id").value = this.getAttribute("data-id");
-  document.getElementById("edit_apellido_nombre").value = this.getAttribute("data-apellido_nombre");
-  document.getElementById("edit_cuit_dni").value = this.getAttribute("data-cuit_dni");
-  document.getElementById("edit_razon_social").value = this.getAttribute("data-razon_social");
-  document.getElementById("edit_telefono").value = this.getAttribute("data-telefono");
-  document.getElementById("edit_correo").value = this.getAttribute("data-correo");
-  document.getElementById("edit_rubro").value = this.getAttribute("data-rubro");
-  // El modal se abre automáticamente por Bootstrap con data-bs-toggle/data-bs-target
+  // Obtener todos los campos dinámicamente
+  const campos = document.querySelectorAll('#editForm input:not([type="hidden"])');
+  campos.forEach(campo => {
+    const nombreCampo = campo.name;
+    const valor = this.getAttribute(`data-${nombreCampo}`) || '';
+    document.getElementById(`edit_${nombreCampo}`).value = valor;
+  });
 }
 
   // Manejador para el botón de eliminar
@@ -384,32 +381,35 @@ if (editForm) {
   // Guardado manual por AJAX
 const manualForm = document.getElementById("manualForm");
 if (manualForm) {
-  manualForm.addEventListener("submit", function(e) {
-    e.preventDefault();
-    const formData = new FormData(manualForm);
-    formData.append("ajax", "1"); // Para indicar petición AJAX
+    manualForm.addEventListener("submit", async function(e) {
+        e.preventDefault();
+        const formData = new FormData(manualForm);
+        formData.append("ajax", "1");
 
-    fetch(window.location.pathname + window.location.search, {
-      method: "POST",
-      body: formData
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.success) {
-        showFloatingMessage("Registro guardado correctamente.");
-        manualForm.reset();
-        if (typeof loadUsers === "function") loadUsers();
-      } else {
-        showFloatingMessage(data.error || "Error al guardar.", true);
-      }
-    })
-    .catch(() => {
-      showFloatingMessage("Error de conexión.", true);
+        try {
+            const response = await fetch(window.location.pathname + window.location.search, {
+                method: "POST",
+                body: formData
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                showFloatingMessage("Registro guardado correctamente");
+                manualForm.reset();
+                if (typeof loadUsers === "function") {
+                    loadUsers();
+                }
+            } else {
+                throw new Error(data.error || "Error al guardar");
+            }
+        } catch (error) {
+            showFloatingMessage(error.message || "Error de conexión", true);
+        }
     });
-  });
 }
 
- // Exportar tabla a Excel
+// Exportar tabla a Excel
 const exportBtn = document.getElementById("exportExcelBtn");
 if (exportBtn) {
   exportBtn.addEventListener("click", function() {

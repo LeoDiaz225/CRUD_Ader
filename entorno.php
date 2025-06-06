@@ -37,32 +37,66 @@ $stmt->execute();
 $campos = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
 // Guardar manualmente si es un formulario de carga manual (no CSV)
-if (
-  $_SERVER["REQUEST_METHOD"] === "POST" && 
-  isset($_POST["apellido_nombre"]) && 
-  !isset($_FILES['csvFile'])
-) {
-  $stmt = $conn->prepare("INSERT INTO `$tabla` (apellido_nombre, cuit_dni, razon_social, telefono, correo, rubro) VALUES (?, ?, ?, ?, ?, ?)");
-  $stmt->bind_param(
-    "ssssss",
-    $_POST["apellido_nombre"],
-    $_POST["cuit_dni"],
-    $_POST["razon_social"],
-    $_POST["telefono"],
-    $_POST["correo"],
-    $_POST["rubro"]
-  );
-
-  // Agregar esto para manejar la respuesta AJAX
-  if (isset($_POST['ajax'])) {
+if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_FILES['csvFile'])) {
     header('Content-Type: application/json');
-    if ($stmt->execute()) {
-      echo json_encode(['success' => true]);
-    } else {
-      echo json_encode(['success' => false, 'error' => "Error al guardar: " . $conn->error]);
+    
+    try {
+        // Obtener campos y sus valores
+        $campos = [];
+        $valores = [];
+        $tipos = '';
+        $params = [];
+
+        $stmt = $conn->prepare("SELECT nombre_campo, tipo_campo FROM entornos_campos 
+                              WHERE entorno_nombre = ? ORDER BY orden");
+        $stmt->bind_param("s", $tabla);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        while ($campo = $result->fetch_assoc()) {
+            $nombre = $campo['nombre_campo'];
+            if (isset($_POST[$nombre])) {
+                $campos[] = $nombre;
+                $valores[] = '?';
+                $params[] = $_POST[$nombre];
+                
+                // Determinar tipo de parámetro para bind_param
+                switch ($campo['tipo_campo']) {
+                    case 'numero':
+                        $tipos .= 'i';
+                        break;
+                    default:
+                        $tipos .= 's';
+                }
+            }
+        }
+
+        if (!empty($campos)) {
+            $sql = sprintf(
+                "INSERT INTO `%s` (%s) VALUES (%s)",
+                $tabla,
+                implode(', ', $campos),
+                implode(', ', $valores)
+            );
+
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param($tipos, ...$params);
+            
+            if ($stmt->execute()) {
+                echo json_encode(['success' => true]);
+            } else {
+                throw new Exception($conn->error);
+            }
+        } else {
+            throw new Exception('No se recibieron datos válidos');
+        }
+    } catch (Exception $e) {
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
     }
     exit;
-  }
 }
 
 ?>
@@ -193,12 +227,36 @@ if (
           <input type="hidden" name="id" id="edit_id">
           <input type="hidden" name="tabla" id="edit_tabla" value="<?= htmlspecialchars($tabla) ?>">
           <div class="mb-2">
-            <input type="text" name="apellido_nombre" id="edit_apellido_nombre" class="form-control mb-2" placeholder="Apellido y Nombre" required>
-            <input type="text" name="cuit_dni" id="edit_cuit_dni" class="form-control mb-2" placeholder="CUIT o DNI" required>
-            <input type="text" name="razon_social" id="edit_razon_social" class="form-control mb-2" placeholder="Razón Social" required>
-            <input type="text" name="telefono" id="edit_telefono" class="form-control mb-2" placeholder="Teléfono" required>
-            <input type="email" name="correo" id="edit_correo" class="form-control mb-2" placeholder="Correo Electrónico" required>
-            <input type="text" name="rubro" id="edit_rubro" class="form-control mb-2" placeholder="Rubro" required>
+            <?php foreach ($campos as $campo): ?>
+              <?php if ($campo['tipo_campo'] === 'numero'): ?>
+                <input type="number" 
+                       name="<?= htmlspecialchars($campo['nombre_campo']) ?>" 
+                       id="edit_<?= htmlspecialchars($campo['nombre_campo']) ?>"
+                       class="form-control mb-2" 
+                       placeholder="<?= htmlspecialchars($campo['nombre_campo']) ?>"
+                       <?= $campo['es_requerido'] ? 'required' : '' ?>>
+              <?php elseif ($campo['tipo_campo'] === 'email'): ?>
+                <input type="email" 
+                       name="<?= htmlspecialchars($campo['nombre_campo']) ?>" 
+                       id="edit_<?= htmlspecialchars($campo['nombre_campo']) ?>"
+                       class="form-control mb-2" 
+                       placeholder="<?= htmlspecialchars($campo['nombre_campo']) ?>"
+                       <?= $campo['es_requerido'] ? 'required' : '' ?>>
+              <?php elseif ($campo['tipo_campo'] === 'fecha'): ?>
+                <input type="date" 
+                       name="<?= htmlspecialchars($campo['nombre_campo']) ?>" 
+                       id="edit_<?= htmlspecialchars($campo['nombre_campo']) ?>"
+                       class="form-control mb-2" 
+                       <?= $campo['es_requerido'] ? 'required' : '' ?>>
+              <?php else: ?>
+                <input type="text" 
+                       name="<?= htmlspecialchars($campo['nombre_campo']) ?>" 
+                       id="edit_<?= htmlspecialchars($campo['nombre_campo']) ?>"
+                       class="form-control mb-2" 
+                       placeholder="<?= htmlspecialchars($campo['nombre_campo']) ?>"
+                       <?= $campo['es_requerido'] ? 'required' : '' ?>>
+              <?php endif; ?>
+            <?php endforeach; ?>
           </div>
         </div>
         <div class="modal-footer border-0">
