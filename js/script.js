@@ -582,56 +582,36 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Función para inicializar la gestión de usuarios
 function initializeUserManagement() {
-    // Handler para botones de edición
+    // Manejador para botones de edición
     document.querySelectorAll('.edit-user-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const userId = this.getAttribute('data-id');
             const username = this.getAttribute('data-username');
             const rol = this.getAttribute('data-rol');
             const permisos = JSON.parse(this.getAttribute('data-permisos'));
+            const entornos = this.getAttribute('data-entornos');
             
             // Llenar el formulario con los datos actuales
             document.getElementById('edit_user_id').value = userId;
             document.getElementById('edit_username').value = username;
             document.getElementById('edit_rol').value = rol;
             
-            // Resetear todos los checkboxes primero
-            document.querySelectorAll('#editarUsuarioForm input[type="checkbox"]').forEach(checkbox => {
-                checkbox.checked = false;
-            });
-            
-            // Establecer los checkboxes según los permisos actuales
-            Object.keys(permisos).forEach(permiso => {
-                const checkbox = document.getElementById(`edit_${permiso}`);
-                if (checkbox) {
-                    checkbox.checked = permisos[permiso] === 1;
-                }
-            });
+            // Actualizar checkboxes según los permisos
+            document.getElementById('edit_puede_crear_entorno').checked = permisos.puede_crear_entorno === 1;
+            document.getElementById('edit_puede_eliminar_entorno').checked = permisos.puede_eliminar_entorno === 1;
+            document.getElementById('edit_puede_editar_entorno').checked = permisos.puede_editar_entorno === 1;
+            document.getElementById('edit_puede_editar_registros').checked = permisos.puede_editar_registros === 1;
+            document.getElementById('edit_puede_eliminar_registros').checked = permisos.puede_eliminar_registros === 1;
         });
     });
 
-    // Handler para el formulario de edición
+    // Manejador para el formulario de edición
     const editForm = document.getElementById('editarUsuarioForm');
     if (editForm) {
         editForm.addEventListener('submit', function(e) {
             e.preventDefault();
             const formData = new FormData(this);
-
-            // Asegurar que los checkboxes no marcados se envíen como 0
-            const permisosFields = [
-                'puede_crear_entorno',
-                'puede_eliminar_entorno',
-                'puede_editar_entorno',
-                'puede_editar_registros',
-                'puede_eliminar_registros'
-            ];
-
-            permisosFields.forEach(permiso => {
-                if (!formData.has(permiso)) {
-                    formData.append(permiso, '0');
-                }
-            });
-
+            
             fetch('admin/update_user.php', {
                 method: 'POST',
                 body: formData
@@ -642,6 +622,7 @@ function initializeUserManagement() {
                     showFloatingMessage('Usuario actualizado correctamente');
                     const modal = bootstrap.Modal.getInstance(document.getElementById('editarUsuarioModal'));
                     modal.hide();
+                    // Recargar la página para ver los cambios
                     setTimeout(() => location.reload(), 500);
                 } else {
                     throw new Error(data.error || 'Error al actualizar usuario');
@@ -652,5 +633,38 @@ function initializeUserManagement() {
             });
         });
     }
+
+    // Manejador para botones de eliminar usuario
+    document.querySelectorAll('.delete-user-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const userId = this.getAttribute('data-user-id');
+            const username = this.getAttribute('data-username');
+            
+            if (confirm(`¿Está seguro que desea eliminar al usuario "${username}"?`)) {
+                const formData = new FormData();
+                formData.append('user_id', userId);
+
+                fetch('admin/delete_user.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showFloatingMessage('Usuario eliminado correctamente');
+                        this.closest('tr').remove();
+                    } else {
+                        throw new Error(data.error || 'Error al eliminar usuario');
+                    }
+                })
+                .catch(error => {
+                    showFloatingMessage(error.message, true);
+                });
+            }
+        });
+    });
 }
+
+// Asegurarse de que la función se ejecute cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', initializeUserManagement);
 });

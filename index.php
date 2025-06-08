@@ -374,13 +374,14 @@ $result = $conn->query("SELECT * FROM entornos ORDER BY fecha_creacion DESC");
                     </small>
                   </td>
                   <td>
-                    <button type="button" 
+                    <button type="button"
                             class="btn btn-warning btn-sm me-1 edit-user-btn"
                             data-bs-toggle="modal" 
                             data-bs-target="#editarUsuarioModal"
                             data-id="<?= $user['id'] ?>"
                             data-username="<?= htmlspecialchars($user['username']) ?>"
                             data-rol="<?= htmlspecialchars($user['rol']) ?>"
+                            data-entornos="<?= htmlspecialchars($user['entornos_asignados']) ?>"
                             data-permisos='<?= json_encode([
                                 "puede_crear_entorno" => (int)$user['puede_crear_entorno'],
                                 "puede_eliminar_entorno" => (int)$user['puede_eliminar_entorno'],

@@ -18,14 +18,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $rol = $_POST['rol'] ?? 'user';
     
-    // Convertir explícitamente los valores a enteros
+    // Convertir los valores a enteros
     $puede_crear_entorno = isset($_POST['puede_crear_entorno']) ? 1 : 0;
     $puede_eliminar_entorno = isset($_POST['puede_eliminar_entorno']) ? 1 : 0;
     $puede_editar_entorno = isset($_POST['puede_editar_entorno']) ? 1 : 0;
     $puede_editar_registros = isset($_POST['puede_editar_registros']) ? 1 : 0;
     $puede_eliminar_registros = isset($_POST['puede_eliminar_registros']) ? 1 : 0;
     
-    // Verificar que exista el usuario
+    // Verificar que el usuario exista
     $check_user = $conn->prepare("SELECT rol FROM usuarios WHERE id = ?");
     $check_user->bind_param("i", $user_id);
     $check_user->execute();
