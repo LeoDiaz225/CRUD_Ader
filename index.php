@@ -421,7 +421,7 @@ $result = $conn->query("SELECT * FROM entornos ORDER BY fecha_creacion DESC");
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label class="form-label">Usuario</label>
-                            <input type="text" id="edit_username" class="form-control" readonly>
+                            <input type="text" id="edit_username" class="form-control bg-dark text-light" readonly>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Rol</label>
@@ -436,25 +436,25 @@ $result = $conn->query("SELECT * FROM entornos ORDER BY fecha_creacion DESC");
                             <label class="form-label">Permisos</label>
                             <div class="row g-3">
                                 <div class="col-md-6">
-                                    <div class="form-check">
+                                    <div class="form-check mb-2">
                                         <input type="checkbox" class="form-check-input" id="edit_puede_crear_entorno" name="puede_crear_entorno" value="1">
                                         <label class="form-check-label" for="edit_puede_crear_entorno">Crear entornos</label>
                                     </div>
-                                    <div class="form-check">
+                                    <div class="form-check mb-2">
                                         <input type="checkbox" class="form-check-input" id="edit_puede_eliminar_entorno" name="puede_eliminar_entorno" value="1">
                                         <label class="form-check-label" for="edit_puede_eliminar_entorno">Eliminar entornos</label>
                                     </div>
-                                    <div class="form-check">
+                                    <div class="form-check mb-2">
                                         <input type="checkbox" class="form-check-input" id="edit_puede_editar_entorno" name="puede_editar_entorno" value="1">
                                         <label class="form-check-label" for="edit_puede_editar_entorno">Editar entornos</label>
                                     </div>
-                            </div>
+                                </div>
                                 <div class="col-md-6">
-                                    <div class="form-check">
+                                    <div class="form-check mb-2">
                                         <input type="checkbox" class="form-check-input" id="edit_puede_editar_registros" name="puede_editar_registros" value="1">
                                         <label class="form-check-label" for="edit_puede_editar_registros">Editar registros</label>
                                     </div>
-                                    <div class="form-check">
+                                    <div class="form-check mb-2">
                                         <input type="checkbox" class="form-check-input" id="edit_puede_eliminar_registros" name="puede_eliminar_registros" value="1">
                                         <label class="form-check-label" for="edit_puede_eliminar_registros">Eliminar registros</label>
                                     </div>
@@ -464,8 +464,9 @@ $result = $conn->query("SELECT * FROM entornos ORDER BY fecha_creacion DESC");
                     </div>
                 </div>
                 <div class="modal-footer border-0">
-                    <button type="submit" class="btn btn-success">Guardar cambios</button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="bi bi-save"></i> Guardar cambios
+                    </button>
                 </div>
             </form>
         </div>

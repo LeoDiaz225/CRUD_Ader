@@ -1,10 +1,11 @@
 <?php
 $host = "localhost";
-$user = "admin";      
-$pass = "123";          
+$user = "root";      
+$pass = "";          
 $db = "ader_db";
+$port = 3307;
 
-$conn = new mysqli($host, $user, $pass, $db);
+$conn = new mysqli($host, $user, $pass, $db, $port);
 if ($conn->connect_error) {
     if (strpos($_SERVER['PHP_SELF'], 'environments/') !== false) {
         header('Content-Type: application/json');
