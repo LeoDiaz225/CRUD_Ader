@@ -382,30 +382,35 @@ if (editForm) {
   // Guardado manual por AJAX
 const manualForm = document.getElementById("manualForm");
 if (manualForm) {
-    manualForm.addEventListener("submit", async function(e) {
+    manualForm.addEventListener('submit', async function(e) {
         e.preventDefault();
-        const formData = new FormData(manualForm);
-        formData.append("ajax", "1");
+        
+        // Validate form using HTML5 validation
+        if (!this.checkValidity()) {
+            e.stopPropagation();
+            this.classList.add('was-validated');
+            return;
+        }
 
         try {
-            const response = await fetch(window.location.pathname + window.location.search, {
-                method: "POST",
+            const formData = new FormData(this);
+            const response = await fetch(window.location.href, {
+                method: 'POST',
                 body: formData
             });
 
             const data = await response.json();
             
             if (data.success) {
-                showFloatingMessage("Registro guardado correctamente");
-                manualForm.reset();
-                if (typeof loadUsers === "function") {
-                    loadUsers();
-                }
+                showFloatingMessage('Registro guardado correctamente');
+                this.reset();
+                this.classList.remove('was-validated');
+                loadUsers(); // Reload the table
             } else {
-                throw new Error(data.error || "Error al guardar");
+                throw new Error(data.error || 'Error al guardar el registro');
             }
         } catch (error) {
-            showFloatingMessage(error.message || "Error de conexión", true);
+            showFloatingMessage(error.message, true);
         }
     });
 }
@@ -523,5 +528,39 @@ if (deleteEnvironmentModal) {
     }
   });
 }
+
+// Agregar este código en script.js o en un bloque <script> al final del archivo
+document.getElementById('manualForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const form = e.target;
+    if (!form.checkValidity()) {
+        e.stopPropagation();
+        form.classList.add('was-validated');
+        return;
+    }
+
+    // Continuar con el envío del formulario si pasa las validaciones
+    const formData = new FormData(form);
+    fetch(window.location.href, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            form.reset();
+            form.classList.remove('was-validated');
+            // Actualizar la tabla o mostrar mensaje de éxito
+            cargarRegistros(); // Asumiendo que existe esta función
+            mostrarAlerta('Registro guardado exitosamente', 'success');
+        } else {
+            mostrarAlerta('Error al guardar: ' + data.error, 'danger');
+        }
+    })
+    .catch(error => {
+        mostrarAlerta('Error al procesar la solicitud', 'danger');
+    });
+});
 
 });

@@ -41,13 +41,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_FILES['csvFile'])) {
     header('Content-Type: application/json');
     
     try {
-        // Obtener campos y sus valores
         $campos = [];
         $valores = [];
         $tipos = '';
         $params = [];
+        $errores = [];
 
-        $stmt = $conn->prepare("SELECT nombre_campo, tipo_campo FROM entornos_campos 
+        $stmt = $conn->prepare("SELECT nombre_campo, tipo_campo, es_requerido FROM entornos_campos 
                               WHERE entorno_nombre = ? ORDER BY orden");
         $stmt->bind_param("s", $tabla);
         $stmt->execute();
@@ -55,40 +55,94 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_FILES['csvFile'])) {
 
         while ($campo = $result->fetch_assoc()) {
             $nombre = $campo['nombre_campo'];
-            if (isset($_POST[$nombre])) {
-                $campos[] = $nombre;
-                $valores[] = '?';
-                $params[] = $_POST[$nombre];
-                
-                // Determinar tipo de parámetro para bind_param
-                switch ($campo['tipo_campo']) {
-                    case 'numero':
+            $valor = $_POST[$nombre] ?? null;
+
+            // Validar campo requerido
+            if ($campo['es_requerido'] && ($valor === null || trim($valor) === '')) {
+                $errores[] = "El campo {$nombre} es requerido";
+                continue;
+            }
+
+            // Validar según tipo
+            switch ($campo['tipo_campo']) {
+                case 'numero':
+                    if ($valor !== null && $valor !== '' && !is_numeric($valor)) {
+                        $errores[] = "El campo {$nombre} debe ser numérico";
                         $tipos .= 'i';
                         break;
-                    default:
+                    }
+                    $tipos .= 'i';
+                    break;
+                    
+                case 'email':
+                    if ($valor !== null && $valor !== '' && !filter_var($valor, FILTER_VALIDATE_EMAIL)) {
+                        $errores[] = "El campo {$nombre} debe ser un email válido";
                         $tipos .= 's';
-                }
+                        break;
+                    }
+                    $tipos .= 's';
+                    break;
+
+                case 'fecha':
+                    if ($valor !== null && $valor !== '') {
+                        $fecha = DateTime::createFromFormat('Y-m-d', $valor);
+                        if (!$fecha || $fecha->format('Y-m-d') !== $valor) {
+                            $errores[] = "El campo {$nombre} debe ser una fecha válida";
+                            $tipos .= 's';
+                            break;
+                        }
+                    }
+                    $tipos .= 's';
+                    break;
+
+                case 'telefono':
+                    if ($valor !== null && $valor !== '' && !preg_match('/^[0-9]{9,15}$/', $valor)) {
+                        $errores[] = "El campo {$nombre} debe ser un teléfono válido (9-15 dígitos)";
+                        $tipos .= 's';
+                        break;
+                    }
+                    $tipos .= 's';
+                    break;
+
+                default:
+                    if ($valor !== null && strlen($valor) > 255) {
+                        $errores[] = "El campo {$nombre} no puede exceder 255 caracteres";
+                        $tipos .= 's';
+                        break;
+                    }
+                    $tipos .= 's';
+                    break;
+            }
+
+            if ($valor !== null && $valor !== '') {
+                $campos[] = $nombre;
+                $valores[] = '?';
+                $params[] = $valor;
             }
         }
 
-        if (!empty($campos)) {
-            $sql = sprintf(
-                "INSERT INTO `%s` (%s) VALUES (%s)",
-                $tabla,
-                implode(', ', $campos),
-                implode(', ', $valores)
-            );
+        if (!empty($errores)) {
+            throw new Exception(implode('. ', $errores));
+        }
 
-            $stmt = $conn->prepare($sql);
-            $stmt->bind_param($tipos, ...$params);
-            
-            if ($stmt->execute()) {
-                echo json_encode(['success' => true]);
-            } else {
-                throw new Exception($conn->error);
-            }
-        } else {
+        if (empty($campos)) {
             throw new Exception('No se recibieron datos válidos');
+        }
+
+        $sql = sprintf(
+            "INSERT INTO `%s` (%s) VALUES (%s)",
+            $tabla,
+            implode(', ', $campos),
+            implode(', ', $valores)
+        );
+
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param($tipos, ...$params);
+        
+        if ($stmt->execute()) {
+            echo json_encode(['success' => true]);
+        } else {
+            throw new Exception($conn->error);
         }
     } catch (Exception $e) {
         echo json_encode([
@@ -136,23 +190,49 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_FILES['csvFile'])) {
                     <input type="number" 
                            name="<?= htmlspecialchars($campo['nombre_campo']) ?>" 
                            class="form-control"
-                           <?= $campo['es_requerido'] ? 'required' : '' ?>>
+                           min="0"
+                           max="999999999"
+                           step="any"
+                           <?= $campo['es_requerido'] ? 'required' : '' ?>
+                           oninput="this.value = this.value.replace(/[^0-9.-]/g, '')">
+
                 <?php elseif ($campo['tipo_campo'] === 'email'): ?>
                     <input type="email" 
                            name="<?= htmlspecialchars($campo['nombre_campo']) ?>" 
                            class="form-control"
+                           pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$"
+                           maxlength="100"
                            <?= $campo['es_requerido'] ? 'required' : '' ?>>
+
                 <?php elseif ($campo['tipo_campo'] === 'fecha'): ?>
                     <input type="date" 
                            name="<?= htmlspecialchars($campo['nombre_campo']) ?>" 
                            class="form-control"
+                           min="1900-01-01"
+                           max="2100-12-31"
                            <?= $campo['es_requerido'] ? 'required' : '' ?>>
+
+                <?php elseif ($campo['tipo_campo'] === 'telefono'): ?>
+                    <input type="tel" 
+                           name="<?= htmlspecialchars($campo['nombre_campo']) ?>" 
+                           class="form-control"
+                           pattern="[0-9]{9,15}"
+                           maxlength="15"
+                           title="Ingrese un número de teléfono válido (9-15 dígitos)"
+                           <?= $campo['es_requerido'] ? 'required' : '' ?>>
+
                 <?php else: ?>
                     <input type="text" 
                            name="<?= htmlspecialchars($campo['nombre_campo']) ?>" 
                            class="form-control"
+                           maxlength="255"
+                           pattern="[A-Za-z0-9\s\-_.,]*"
+                           title="Solo se permiten letras, números y algunos caracteres especiales"
                            <?= $campo['es_requerido'] ? 'required' : '' ?>>
                 <?php endif; ?>
+                <div class="invalid-feedback">
+                    Por favor ingrese un valor válido para <?= htmlspecialchars($campo['nombre_campo']) ?>
+                </div>
             </div>
         <?php endforeach; ?>
         <div class="col-12">
