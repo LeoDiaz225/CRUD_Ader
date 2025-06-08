@@ -25,7 +25,12 @@ function showFloatingMessage(msg, isError = false) {
   }, 3000);
 }
 
+
 document.addEventListener("DOMContentLoaded", () => {
+  // Detectar si estamos en la página de entorno o en la página de usuarios
+  const isEnvironmentPage = window.location.pathname.includes('entorno.php');
+  console.log("Página de entorno:", isEnvironmentPage);
+  
   const phpAlertDiv = document.getElementById('mensaje-alerta');
   if (phpAlertDiv) {
     const mensaje = phpAlertDiv.dataset.mensaje;
@@ -169,23 +174,16 @@ data.forEach(user => {
     if (puedeEditarRegistros || puedeEliminarRegistros) {
         const tdAcciones = document.createElement("td");
         
-        if (puedeEditarRegistros) {
-            const btnEditar = document.createElement("button");
-            btnEditar.className = "btn btn-warning btn-sm edit-btn me-1";
-            btnEditar.innerHTML = '<i class="bi bi-pencil"></i> Editar';
-            btnEditar.setAttribute("data-bs-toggle", "modal");
-            btnEditar.setAttribute("data-bs-target", "#editModal");
-            btnEditar.setAttribute("data-id", user.id);
-            
-            // Agregar atributos data-* para cada campo
-            Object.keys(user).forEach(key => {
-                if (key !== 'id') {
-                    btnEditar.setAttribute(`data-${key}`, user[key] || '');
-                }
-            });
-            
-            tdAcciones.appendChild(btnEditar);
-        }
+ if (puedeEditarRegistros) {
+    const btnEditar = document.createElement("button");
+    btnEditar.className = "btn btn-warning btn-sm edit-btn me-1";
+    btnEditar.innerHTML = '<i class="bi bi-pencil"></i> Editar';
+    btnEditar.setAttribute("data-bs-toggle", "modal");
+    btnEditar.setAttribute("data-bs-target", "#editModal");
+    // Asegurarse de que el botón tenga el ID del registro
+    btnEditar.setAttribute("data-id", user.id);
+    tdAcciones.appendChild(btnEditar);
+}
         
         if (puedeEliminarRegistros) {
             const btnEliminar = document.createElement("button");
@@ -303,7 +301,13 @@ function activarBotones() {
   // Activar botones de edición
   document.querySelectorAll(".edit-btn").forEach(btn => {
     btn.removeEventListener("click", handleEdit); // Evitar duplicados
-    btn.addEventListener("click", handleEdit);
+    btn.removeEventListener("click", handleEnvironmentEdit); // Evitar duplicados
+    
+    if (isEnvironmentPage) {
+        btn.addEventListener("click", handleEnvironmentEdit);
+    } else {
+        btn.addEventListener("click", handleEdit);
+    }
   });
 }
 
@@ -333,6 +337,25 @@ function handleEdit() {
             checkbox.checked = permisos[permiso] === 1;
         }
     });
+}
+
+function handleEnvironmentEdit(event) {
+    const btn = event.currentTarget;
+    const row = btn.closest('tr');
+    const cells = row.querySelectorAll('td');
+    const formInputs = document.querySelectorAll('#editForm input[type="text"], #editForm input[type="number"], #editForm input[type="email"], #editForm input[type="date"]');
+    
+    // Establecer el ID en el formulario
+    document.getElementById('edit_id').value = row.getAttribute('data-id');
+    
+    // Mapear cada celda con su correspondiente input en el formulario
+    formInputs.forEach((input, index) => {
+        if (cells[index]) {
+            input.value = cells[index].textContent.trim();
+        }
+    });
+    
+    console.log('Datos cargados en el formulario de edición');
 }
 
 // Manejador para el botón de eliminar
@@ -637,6 +660,5 @@ function initializeUserManagement() {
     });
 }
 });
-// Asegurarse de que la función se ejecute cuando el DOM esté listo
-document.addEventListener('DOMContentLoaded', initializeUserManagement);
+
 
