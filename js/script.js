@@ -544,7 +544,7 @@ if (deleteEnvironmentModal) {
     }
   });
 }
-
+ });
 document.addEventListener('DOMContentLoaded', function() {
     // Inicializar handlers para botones de edición y eliminación
     initializeUserManagement();
@@ -667,4 +667,4 @@ function initializeUserManagement() {
 
 // Asegurarse de que la función se ejecute cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', initializeUserManagement);
-});
+
