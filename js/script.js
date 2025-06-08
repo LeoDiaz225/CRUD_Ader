@@ -529,38 +529,176 @@ if (deleteEnvironmentModal) {
   });
 }
 
-// Agregar este código en script.js o en un bloque <script> al final del archivo
-document.getElementById('manualForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const form = e.target;
-    if (!form.checkValidity()) {
-        e.stopPropagation();
-        form.classList.add('was-validated');
-        return;
-    }
+function initializeUserManagement() {
+    const editButtons = document.querySelectorAll('.edit-user-btn');
+    const editForm = document.getElementById('editarUsuarioForm');
+    const editModal = document.getElementById('editarUsuarioModal');
 
-    // Continuar con el envío del formulario si pasa las validaciones
-    const formData = new FormData(form);
-    fetch(window.location.href, {
+    if (editButtons && editForm) {
+        // Remover event listeners duplicados
+        editButtons.forEach(button => {
+            button.removeEventListener('click', handleEditUserClick);
+            button.addEventListener('click', handleEditUserClick);
+        });
+
+        // Remover event listener duplicado del formulario
+        editForm.removeEventListener('submit', handleEditFormSubmit);
+        editForm.addEventListener('submit', handleEditFormSubmit);
+    }
+}
+
+// Función para manejar el click en el botón de editar
+function handleEditUserClick() {
+    const userId = this.getAttribute('data-id');
+    const username = this.getAttribute('data-username');
+    const rol = this.getAttribute('data-rol');
+    const permisos = JSON.parse(this.getAttribute('data-permisos'));
+    
+    document.getElementById('edit_user_id').value = userId;
+    document.getElementById('edit_username').value = username;
+    document.getElementById('edit_rol').value = rol;
+    
+    // Actualizar checkboxes
+    const permisosFields = [
+        'puede_crear_entorno',
+        'puede_eliminar_entorno',
+        'puede_editar_entorno',
+        'puede_editar_registros',
+        'puede_eliminar_registros'
+    ];
+
+    permisosFields.forEach(permiso => {
+        const checkbox = document.getElementById(`edit_${permiso}`);
+        if (checkbox) {
+            checkbox.checked = permisos[permiso] === 1;
+        }
+    });
+}
+
+// Función para manejar el envío del formulario
+function handleEditFormSubmit(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+
+    // Asegurar que los checkboxes no marcados se envíen como 0
+    const permisosFields = [
+        'puede_crear_entorno',
+        'puede_eliminar_entorno',
+        'puede_editar_entorno',
+        'puede_editar_registros',
+        'puede_eliminar_registros'
+    ];
+
+    permisosFields.forEach(permiso => {
+        if (!formData.has(permiso)) {
+            formData.append(permiso, '0');
+        }
+    });
+
+    fetch('admin/update_user.php', {
         method: 'POST',
         body: formData
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            form.reset();
-            form.classList.remove('was-validated');
-            // Actualizar la tabla o mostrar mensaje de éxito
-            cargarRegistros(); // Asumiendo que existe esta función
-            mostrarAlerta('Registro guardado exitosamente', 'success');
+            showFloatingMessage('Usuario actualizado correctamente');
+            const modalElement = document.getElementById('editarUsuarioModal');
+            const modal = bootstrap.Modal.getInstance(modalElement);
+            if (modal) {
+                modal.hide();
+            }
+            setTimeout(() => location.reload(), 500);
         } else {
-            mostrarAlerta('Error al guardar: ' + data.error, 'danger');
+            throw new Error(data.error || 'Error al actualizar usuario');
         }
     })
     .catch(error => {
-        mostrarAlerta('Error al procesar la solicitud', 'danger');
+        showFloatingMessage(error.message, true);
+        console.error('Error:', error);
+    });
+}
+
+// Agregar manejadores de eventos para eliminar usuarios
+document.querySelectorAll('.delete-user-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        if (confirm('¿Está seguro de eliminar este usuario?')) {
+            const userId = this.getAttribute('data-user-id');
+            fetch('admin/delete_user.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `user_id=${userId}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showFloatingMessage('Usuario eliminado correctamente');
+                    this.closest('tr').remove();
+                } else {
+                    throw new Error(data.error || 'Error al eliminar usuario');
+                }
+            })
+            .catch(error => {
+                showFloatingMessage(error.message, true);
+            });
+        }
     });
 });
 
+// Mejorar la función de manejo del formulario de edición
+document.getElementById('editarUsuarioForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    
+    // Asegurar que los checkboxes no marcados se envíen como 0
+    ['puede_crear_entorno', 'puede_eliminar_entorno', 'puede_editar_entorno', 
+     'puede_editar_registros', 'puede_eliminar_registros'].forEach(permiso => {
+        if (!formData.has(permiso)) {
+            formData.append(permiso, '0');
+        }
+    });
+
+    fetch('admin/update_user.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editarUsuarioModal'));
+            modal.hide();
+            showFloatingMessage('Usuario actualizado correctamente');
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            throw new Error(data.error || 'Error al actualizar usuario');
+        }
+    })
+    .catch(error => {
+        showFloatingMessage(error.message, true);
+    });
+});
+
+// Mejorar el manejo del botón de edición
+document.querySelectorAll('.edit-user-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const userId = this.getAttribute('data-id');
+        const username = this.getAttribute('data-username');
+        const rol = this.getAttribute('data-rol');
+        const permisos = JSON.parse(this.getAttribute('data-permisos'));
+        
+        document.getElementById('edit_user_id').value = userId;
+        document.getElementById('edit_username').value = username;
+        document.getElementById('edit_rol').value = rol;
+        
+        // Actualizar checkboxes
+        Object.keys(permisos).forEach(key => {
+            const checkbox = document.getElementById(`edit_${key}`);
+            if (checkbox) {
+                checkbox.checked = permisos[key] === 1;
+            }
+        });
+    });
+});
 });
