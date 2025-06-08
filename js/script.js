@@ -549,36 +549,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Inicializar handlers para botones de edición y eliminación
     initializeUserManagement();
 
-    // Handler para botones de eliminar usuario
-    document.querySelectorAll('.delete-user-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const userId = this.getAttribute('data-user-id');
-            const username = this.getAttribute('data-username');
-            
-            if (confirm(`¿Está seguro que desea eliminar al usuario "${username}"?`)) {
-                const formData = new FormData();
-                formData.append('user_id', userId);
-
-                fetch('admin/delete_user.php', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        showFloatingMessage('Usuario eliminado correctamente');
-                        this.closest('tr').remove();
-                    } else {
-                        throw new Error(data.error || 'Error al eliminar usuario');
-                    }
-                })
-                .catch(error => {
-                    showFloatingMessage(error.message, true);
-                });
-            }
-        });
-    });
-});
+   //agregar al codigo copiado aca
+    
 
 // Función para inicializar la gestión de usuarios
 function initializeUserManagement() {
@@ -664,7 +636,7 @@ function initializeUserManagement() {
         });
     });
 }
-
+});
 // Asegurarse de que la función se ejecute cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', initializeUserManagement);
 
