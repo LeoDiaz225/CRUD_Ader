@@ -1,21 +1,47 @@
 <?php
-
 session_start();
-if (!isset($_SESSION["user_id"])) {
-    header("Location: login.php");
-    exit;
+
+if ($_SERVER["REQUEST_METHOD"] === "POST" && (!isset($_POST['csrf_token']) || !Security::validateCSRFToken($_POST['csrf_token']))) {
+    die('Token CSRF inválido');
 }
+// Headers de seguridad
+header("X-Content-Type-Options: nosniff");
+header("X-Frame-Options: DENY");
+header("X-XSS-Protection: 1; mode=block");
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net");
+header("Referrer-Policy: strict-origin-when-cross-origin");
+header("Permissions-Policy: geolocation=(), microphone=(), camera=()");
+
+include "includes/Security.php";
+
+
+
+function validarSesion() {
+    if (!isset($_SESSION['user_id']) || !isset($_SESSION['last_activity'])) {
+        header('Location: login.php');
+        exit;
+    }
+    if (time() - $_SESSION['last_activity'] > 1800) {
+        session_destroy();
+        header('Location: login.php?expired=1');
+        exit;
+    }
+    $_SESSION['last_activity'] = time();
+}
+
+validarSesion();
 
 // Incluir conexión a la base de datos
 include "includes/db.php";
 
 // Validar el nombre de la tabla
 $tabla = preg_replace('/[^a-zA-Z0-9_]/', '', $_GET['tabla'] ?? '');
-if (!$tabla) {
-  die("<div class='container my-5'><div class='alert alert-danger'>Error: Entorno no válido.</div><a href='index.php' class='btn btn-link'><i class='bi bi-arrow-left'></i> Volver a entornos</a></div>");
+$stmt = $conn->prepare("SELECT nombre FROM entornos WHERE nombre = ? LIMIT 1");
+$stmt->bind_param("s", $tabla);
+$stmt->execute();
+if ($stmt->get_result()->num_rows === 0) {
+    die("Tabla no válida");
 }
-
-
 
 $entornos_asignados = isset($_SESSION['entornos_asignados']) ? explode(',', $_SESSION['entornos_asignados']) : [];
 if ($_SESSION['rol'] !== 'admin' && !in_array($tabla, $entornos_asignados)) {
@@ -158,6 +184,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_FILES['csvFile'])) {
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <meta name="csrf-token" content="<?= Security::generateCSRFToken() ?>">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= htmlspecialchars($tabla) ?> - Entorno</title>
   <link rel="stylesheet" href="css/style.css">

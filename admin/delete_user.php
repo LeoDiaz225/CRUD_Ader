@@ -1,5 +1,31 @@
 <?php
 session_start();
+
+include "../includes/Security.php";
+validarSesion();
+
+// Agregar Rate Limiting y CSRF
+if (!RateLimit::check($_SESSION['user_id'], 'delete_user', 5)) {
+    http_response_code(429);
+    die(json_encode(['error' => 'Demasiadas solicitudes']));
+}
+
+if (!isset($_POST['csrf_token']) || !Security::validateCSRFToken($_POST['csrf_token'])) {
+    die(json_encode(['error' => 'Token CSRF inválido']));
+}
+
+// Logging
+Security::logAction($_SESSION['user_id'], 'delete_user', "Usuario eliminado: $user_id");
+
+// Headers de seguridad
+header("X-Content-Type-Options: nosniff");
+header("X-Frame-Options: DENY");
+header("X-XSS-Protection: 1; mode=block");
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net");
+header("Referrer-Policy: strict-origin-when-cross-origin");
+header("Permissions-Policy: geolocation=(), microphone=(), camera=()");
+
+
 include "../includes/db.php";
 
 header('Content-Type: application/json');

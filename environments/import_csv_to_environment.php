@@ -1,4 +1,24 @@
 <?php
+
+session_start();
+include "../includes/Security.php";
+validarSesion();
+
+// Validación de CSRF y validación de tipos
+if (!isset($_POST['csrf_token']) || !Security::validateCSRFToken($_POST['csrf_token'])) {
+    die('Token CSRF inválido');
+}
+
+// Validación de tipo de archivo
+$finfo = finfo_open(FILEINFO_MIME_TYPE);
+$mime_type = finfo_file($finfo, $_FILES['csvFile']['tmp_name']);
+if ($mime_type !== 'text/csv' && $mime_type !== 'text/plain') {
+    die('Tipo de archivo no válido');
+}
+
+// Logging
+Security::logAction($_SESSION['user_id'], 'import_csv', "Importación CSV en tabla: $tabla");
+
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);

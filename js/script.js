@@ -1,3 +1,19 @@
+function getCSRFToken() {
+    return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+}
+
+// Función wrapper para fetch con CSRF
+async function fetchWithCSRF(url, options = {}) {
+    const csrfToken = getCSRFToken();
+    const defaultOptions = {
+        headers: {
+            'X-CSRF-TOKEN': csrfToken
+        }
+    };
+    
+    return fetch(url, { ...defaultOptions, ...options });
+}
+
 function showFloatingMessage(msg, isError = false) {
   let alertDiv = document.createElement('div');
   alertDiv.className = "mensaje-alert";
@@ -60,7 +76,7 @@ if (csvForm) {
     // Agregamos la tabla a formData
     formData.append('tabla', tabla);
 
-    fetch(`environments/import_csv_to_environment.php?tabla=${tabla}`, {
+    fetchWithCSRF(`environments/import_csv_to_environment.php?tabla=${tabla}`, {
       method: 'POST',
       body: formData
     })
@@ -121,7 +137,7 @@ if (csvForm) {
     if (searchTerm && searchTerm.trim() !== "") {
       url += `&search=${encodeURIComponent(searchTerm.trim())}`;
     }
-    fetch(url)
+    fetchWithCSRF(url)
 
       .then(res => {
         if (!res.ok) {
@@ -369,7 +385,7 @@ function handleEnvironmentEdit(event) {
     
     // Configurar el botón de confirmación
     document.getElementById('confirmDeleteRecord').onclick = function() {
-        fetch(`environments/delete_from_environment.php?tabla=${tabla}&id=${id}`)
+        fetchWithCSRF(`environments/delete_from_environment.php?tabla=${tabla}&id=${id}`)
             .then(res => {
                 if (!res.ok) {
                     throw new Error(`Error HTTP: ${res.status}`);
@@ -394,7 +410,7 @@ if (editForm) {
   editForm.onsubmit = function(e) {
     e.preventDefault();
     const formData = new FormData(editForm);
-    fetch("environments/update_from_environment.php", {
+    fetchWithCSRF("environments/update_from_environment.php", {
       method: "POST",
       body: formData
     })
@@ -440,7 +456,7 @@ if (manualForm) {
 
         try {
             const formData = new FormData(this);
-            const response = await fetch(window.location.href, {
+            const response = await fetchWithCSRF(window.location.href, {
                 method: 'POST',
                 body: formData
             });
@@ -614,7 +630,7 @@ function initializeUserManagement() {
             e.preventDefault();
             const formData = new FormData(this);
             
-            fetch('admin/update_user.php', {
+            fetchWithCSRF('admin/update_user.php', {
                 method: 'POST',
                 body: formData
             })
@@ -655,7 +671,7 @@ function initializeUserManagement() {
                 const formData = new FormData();
                 formData.append('user_id', userId);
 
-                fetch('admin/delete_user.php', {
+               fetchWithCSRF('admin/delete_user.php', {
                     method: 'POST',
                     body: formData
                 })

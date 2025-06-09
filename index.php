@@ -1,5 +1,13 @@
 <?php
 session_start();
+
+// Headers de seguridad
+header("X-Content-Type-Options: nosniff");
+header("X-Frame-Options: DENY");
+header("X-XSS-Protection: 1; mode=block");
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net");
+header("Referrer-Policy: strict-origin-when-cross-origin");
+header("Permissions-Policy: geolocation=(), microphone=(), camera=()");
 function esadmin() {
   return isset($_SESSION['rol']) && $_SESSION['rol'] === 'admin'
       && isset($_SESSION['puede_crear_entorno']) && $_SESSION['puede_crear_entorno']

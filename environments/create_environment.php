@@ -1,4 +1,26 @@
 <?php
+session_start();
+include "../includes/Security.php";
+validarSesion();
+
+// Agregar validación CSRF y Rate Limiting
+if (!isset($_POST['csrf_token']) || !Security::validateCSRFToken($_POST['csrf_token'])) {
+    die('Token CSRF inválido');
+}
+
+if (!RateLimit::check($_SESSION['user_id'], 'create_environment', 10)) {
+    http_response_code(429);
+    die('Demasiadas solicitudes');
+}
+
+// Headers de seguridad
+header("X-Content-Type-Options: nosniff");
+header("X-Frame-Options: DENY");
+header("X-XSS-Protection: 1; mode=block");
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net");
+header("Referrer-Policy: strict-origin-when-cross-origin");
+header("Permissions-Policy: geolocation=(), microphone=(), camera=()");
+
 include "../includes/db.php";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
