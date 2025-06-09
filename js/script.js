@@ -25,7 +25,12 @@ function showFloatingMessage(msg, isError = false) {
   }, 3000);
 }
 
+
 document.addEventListener("DOMContentLoaded", () => {
+  // Detectar si estamos en la página de entorno o en la página de usuarios
+  const isEnvironmentPage = window.location.pathname.includes('entorno.php');
+  console.log("Página de entorno:", isEnvironmentPage);
+  
   const phpAlertDiv = document.getElementById('mensaje-alerta');
   if (phpAlertDiv) {
     const mensaje = phpAlertDiv.dataset.mensaje;
@@ -60,7 +65,7 @@ if (csvForm) {
       body: formData
     })
     .then(response => response.text())
-    .then(message => {
+    .then(message => { // Agregado .then para manejar el mensaje
       // Limpiamos el mensaje si contiene HTML
       const cleanMessage = message.replace(/<[^>]*>/g, '').trim();
       showFloatingMessage(cleanMessage);
@@ -153,53 +158,44 @@ if (csvForm) {
         }
 
 data.forEach(user => {
-  const row = document.createElement("tr");
-  row.setAttribute("data-id", user.id);
+    const row = document.createElement("tr");
+    row.setAttribute("data-id", user.id);
 
-  // Creamos el contenido HTML de la fila
-  let actionsHtml = '';
-  if (puedeEditarRegistros) {
-    actionsHtml += `
-      <button 
-        type="button"
-        class="btn btn-warning btn-sm edit-btn"
-        data-id="${user.id}"
-        data-apellido_nombre="${user.apellido_nombre || ''}"
-        data-cuit_dni="${user.cuit_dni || ''}"
-        data-razon_social="${user.razon_social || ''}"
-        data-telefono="${user.telefono || ''}"
-        data-correo="${user.correo || ''}"
-        data-rubro="${user.rubro || ''}"
-        data-bs-toggle="modal"
-        data-bs-target="#editModal"
-      >
-        <i class="bi bi-pencil"></i> Editar
-      </button>
-    `;
-  }
-  if (puedeEliminarRegistros) {
-    actionsHtml += `
-      <button type="button" class="btn btn-danger btn-sm delete-btn">
-        <i class="bi bi-trash"></i> Eliminar
-      </button>
-    `;
-  }
+    // Creamos las celdas para cada campo
+    Object.keys(user).forEach(key => {
+        if (key !== 'id') { // No mostrar el ID en la tabla
+            const td = document.createElement("td");
+            td.textContent = user[key] || '';
+            row.appendChild(td);
+        }
+    });
 
-row.innerHTML = `
-  <td>${user.apellido_nombre || ''}</td>
-  <td>${user.cuit_dni || ''}</td>
-  <td>${user.razon_social || ''}</td>
-  <td>${user.telefono || ''}</td>
-  <td>${user.correo || ''}</td>
-  <td>${user.rubro || ''}</td>
-  ${
-    (puedeEditarRegistros || puedeEliminarRegistros)
-      ? `<td>${actionsHtml}</td>`
-      : ''
-  }
-`;
+    // Agregar columna de acciones SOLO si tiene algún permiso
+    if (puedeEditarRegistros || puedeEliminarRegistros) {
+        const tdAcciones = document.createElement("td");
+        
+ if (puedeEditarRegistros) {
+    const btnEditar = document.createElement("button");
+    btnEditar.className = "btn btn-warning btn-sm edit-btn me-1";
+    btnEditar.innerHTML = '<i class="bi bi-pencil"></i> Editar';
+    btnEditar.setAttribute("data-bs-toggle", "modal");
+    btnEditar.setAttribute("data-bs-target", "#editModal");
+    // Asegurarse de que el botón tenga el ID del registro
+    btnEditar.setAttribute("data-id", user.id);
+    tdAcciones.appendChild(btnEditar);
+}
+        
+        if (puedeEliminarRegistros) {
+            const btnEliminar = document.createElement("button");
+            btnEliminar.className = "btn btn-danger btn-sm delete-btn";
+            btnEliminar.innerHTML = '<i class="bi bi-trash"></i> Eliminar';
+            tdAcciones.appendChild(btnEliminar);
+        }
+        
+        row.appendChild(tdAcciones);
+    }
 
-  userTableBody.appendChild(row);
+    userTableBody.appendChild(row);
 });
 
         // Activamos los botones de edición y eliminación
@@ -305,23 +301,64 @@ function activarBotones() {
   // Activar botones de edición
   document.querySelectorAll(".edit-btn").forEach(btn => {
     btn.removeEventListener("click", handleEdit); // Evitar duplicados
-    btn.addEventListener("click", handleEdit);
+    btn.removeEventListener("click", handleEnvironmentEdit); // Evitar duplicados
+    
+    if (isEnvironmentPage) {
+        btn.addEventListener("click", handleEnvironmentEdit);
+    } else {
+        btn.addEventListener("click", handleEdit);
+    }
   });
 }
 
 // Nuevo handler para editar usando los atributos data-*
 function handleEdit() {
-  document.getElementById("edit_id").value = this.getAttribute("data-id");
-  document.getElementById("edit_apellido_nombre").value = this.getAttribute("data-apellido_nombre");
-  document.getElementById("edit_cuit_dni").value = this.getAttribute("data-cuit_dni");
-  document.getElementById("edit_razon_social").value = this.getAttribute("data-razon_social");
-  document.getElementById("edit_telefono").value = this.getAttribute("data-telefono");
-  document.getElementById("edit_correo").value = this.getAttribute("data-correo");
-  document.getElementById("edit_rubro").value = this.getAttribute("data-rubro");
-  // El modal se abre automáticamente por Bootstrap con data-bs-toggle/data-bs-target
+    const userId = this.getAttribute('data-id');
+    const username = this.getAttribute('data-username');
+    const rol = this.getAttribute('data-rol');
+    const permisos = JSON.parse(this.getAttribute('data-permisos'));
+    
+    document.getElementById('edit_user_id').value = userId;
+    document.getElementById('edit_username').value = username;
+    document.getElementById('edit_rol').value = rol;
+    
+    // Actualizar estado de los checkboxes basado en los permisos actuales
+    const permisosFields = [
+        'puede_crear_entorno',
+        'puede_eliminar_entorno',
+        'puede_editar_entorno',
+        'puede_editar_registros',
+        'puede_eliminar_registros'
+    ];
+
+    permisosFields.forEach(permiso => {
+        const checkbox = document.getElementById(`edit_${permiso}`);
+        if (checkbox) {
+            checkbox.checked = permisos[permiso] === 1;
+        }
+    });
 }
 
-  // Manejador para el botón de eliminar
+function handleEnvironmentEdit(event) {
+    const btn = event.currentTarget;
+    const row = btn.closest('tr');
+    const cells = row.querySelectorAll('td');
+    const formInputs = document.querySelectorAll('#editForm input[type="text"], #editForm input[type="number"], #editForm input[type="email"], #editForm input[type="date"]');
+    
+    // Establecer el ID en el formulario
+    document.getElementById('edit_id').value = row.getAttribute('data-id');
+    
+    // Mapear cada celda con su correspondiente input en el formulario
+    formInputs.forEach((input, index) => {
+        if (cells[index]) {
+            input.value = cells[index].textContent.trim();
+        }
+    });
+    
+    console.log('Datos cargados en el formulario de edición');
+}
+
+// Manejador para el botón de eliminar
   function handleDelete() {
   const tr = this.closest("tr");
   const id = tr.dataset.id;
@@ -373,7 +410,7 @@ if (editForm) {
   };
 }
 
-  // Iniciar carga de datos si estamos en la página correcta
+// Iniciar carga de datos si estamos en la página correcta
   if (tabla && userTableBody) {
     console.log("Iniciando carga de datos para tabla:", tabla);
     loadUsers();
@@ -384,79 +421,72 @@ if (editForm) {
   // Guardado manual por AJAX
 const manualForm = document.getElementById("manualForm");
 if (manualForm) {
-  manualForm.addEventListener("submit", function(e) {
-    e.preventDefault();
-    const formData = new FormData(manualForm);
-    formData.append("ajax", "1"); // Para indicar petición AJAX
+    manualForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        // Validate form using HTML5 validation
+        if (!this.checkValidity()) {
+            e.stopPropagation();
+            this.classList.add('was-validated');
+            return;
+        }
 
-    fetch(window.location.pathname + window.location.search, {
-      method: "POST",
-      body: formData
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.success) {
-        showFloatingMessage("Registro guardado correctamente.");
-        manualForm.reset();
-        if (typeof loadUsers === "function") loadUsers();
-      } else {
-        showFloatingMessage(data.error || "Error al guardar.", true);
-      }
-    })
-    .catch(() => {
-      showFloatingMessage("Error de conexión.", true);
+        try {
+            const formData = new FormData(this);
+            const response = await fetch(window.location.href, {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                showFloatingMessage('Registro guardado correctamente');
+                this.reset();
+                this.classList.remove('was-validated');
+                loadUsers(); // Reload the table
+            } else {
+                throw new Error(data.error || 'Error al guardar el registro');
+            }
+        } catch (error) {
+            showFloatingMessage(error.message, true);
+        }
     });
-  });
 }
 
- // Exportar tabla a Excel
+// Exportar tabla a Excel
 const exportBtn = document.getElementById("exportExcelBtn");
 if (exportBtn) {
   exportBtn.addEventListener("click", function() {
-    // Pedimos todos los registros al backend (sin paginación)
-    fetch(`environments/read.php?tabla=${tabla}&page=1&limit=1000000`)
-      .then(res => res.json())
-      .then(response => {
-        const data = response.data;
-        if (!Array.isArray(data) || data.length === 0) {
-          alert("No hay datos para exportar.");
-          return;
-        }
+    // Obtener la tabla actual del DOM
+    const table = document.querySelector('table');
+    const thead = table.querySelector('thead');
+    const tbody = document.getElementById('userTableBody');
+    
+    // Crear una nueva tabla para exportar (sin columna de acciones)
+    const exportTable = document.createElement("table");
+    
+    // Copiar el encabezado pero sin la columna de acciones
+    const headerRow = thead.querySelector('tr');
+    const exportHeader = headerRow.cloneNode(true);
+    exportHeader.lastElementChild.remove(); // Eliminar columna de acciones
+    
+    const exportThead = document.createElement("thead");
+    exportThead.appendChild(exportHeader);
+    exportTable.appendChild(exportThead);
+    
+    // Copiar el cuerpo pero sin la columna de acciones
+    const exportTbody = document.createElement("tbody");
+    tbody.querySelectorAll('tr').forEach(row => {
+      const newRow = row.cloneNode(true);
+      newRow.lastElementChild.remove(); // Eliminar columna de acciones
+      exportTbody.appendChild(newRow);
+    });
+    exportTable.appendChild(exportTbody);
 
-        // Creamos una tabla HTML en memoria (sin columna Acciones)
-        const table = document.createElement("table");
-        const thead = document.createElement("thead");
-        const headerRow = document.createElement("tr");
-        ["Apellido y Nombre", "CUIT o DNI", "Razón Social", "Teléfono", "Correo", "Rubro"].forEach(text => {
-          const th = document.createElement("th");
-          th.textContent = text;
-          headerRow.appendChild(th);
-        });
-        thead.appendChild(headerRow);
-        table.appendChild(thead);
-
-        const tbody = document.createElement("tbody");
-        data.forEach(user => {
-          const row = document.createElement("tr");
-          row.innerHTML = `
-            <td>${user.apellido_nombre || ''}</td>
-            <td>${user.cuit_dni || ''}</td>
-            <td>${user.razon_social || ''}</td>
-            <td>${user.telefono || ''}</td>
-            <td>${user.correo || ''}</td>
-            <td>${user.rubro || ''}</td>
-          `;
-          tbody.appendChild(row);
-        });
-        table.appendChild(tbody);
-
-        // Exportar usando XLSX
-        const wb = XLSX.utils.table_to_book(table, {sheet: "Registros"});
-        XLSX.writeFile(wb, `registros_${tabla}.xlsx`);
-      })
-      .catch(err => {
-        alert("Error al exportar: " + err.message);
-      });
+    // Exportar usando XLSX
+    const wb = XLSX.utils.table_to_book(exportTable, {sheet: "Registros"});
+    XLSX.writeFile(wb, `registros_${tabla}.xlsx`);
   });
 }
 
@@ -537,5 +567,98 @@ if (deleteEnvironmentModal) {
     }
   });
 }
+ });
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar handlers para botones de edición y eliminación
+    initializeUserManagement();
 
+   //agregar al codigo copiado aca
+    
+
+// Función para inicializar la gestión de usuarios
+function initializeUserManagement() {
+    // Manejador para botones de edición
+    document.querySelectorAll('.edit-user-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const userId = this.getAttribute('data-id');
+            const username = this.getAttribute('data-username');
+            const rol = this.getAttribute('data-rol');
+            const permisos = JSON.parse(this.getAttribute('data-permisos'));
+            const entornos = this.getAttribute('data-entornos');
+            
+            // Llenar el formulario con los datos actuales
+            document.getElementById('edit_user_id').value = userId;
+            document.getElementById('edit_username').value = username;
+            document.getElementById('edit_rol').value = rol;
+            
+            // Actualizar checkboxes según los permisos
+            document.getElementById('edit_puede_crear_entorno').checked = permisos.puede_crear_entorno === 1;
+            document.getElementById('edit_puede_eliminar_entorno').checked = permisos.puede_eliminar_entorno === 1;
+            document.getElementById('edit_puede_editar_entorno').checked = permisos.puede_editar_entorno === 1;
+            document.getElementById('edit_puede_editar_registros').checked = permisos.puede_editar_registros === 1;
+            document.getElementById('edit_puede_eliminar_registros').checked = permisos.puede_eliminar_registros === 1;
+        });
+    });
+
+    // Manejador para el formulario de edición
+    const editForm = document.getElementById('editarUsuarioForm');
+    if (editForm) {
+        editForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            
+            fetch('admin/update_user.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showFloatingMessage('Usuario actualizado correctamente');
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('editarUsuarioModal'));
+                    modal.hide();
+                    // Recargar la página para ver los cambios
+                    setTimeout(() => location.reload(), 500);
+                } else {
+                    throw new Error(data.error || 'Error al actualizar usuario');
+                }
+            })
+            .catch(error => {
+                showFloatingMessage(error.message, true);
+            });
+        });
+    }
+
+    // Manejador para botones de eliminar usuario
+    document.querySelectorAll('.delete-user-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const userId = this.getAttribute('data-user-id');
+            const username = this.getAttribute('data-username');
+            
+            if (confirm(`¿Está seguro que desea eliminar al usuario "${username}"?`)) {
+                const formData = new FormData();
+                formData.append('user_id', userId);
+
+                fetch('admin/delete_user.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showFloatingMessage('Usuario eliminado correctamente');
+                        this.closest('tr').remove();
+                    } else {
+                        throw new Error(data.error || 'Error al eliminar usuario');
+                    }
+                })
+                .catch(error => {
+                    showFloatingMessage(error.message, true);
+                });
+            }
+        });
+    });
+}
 });
+
+

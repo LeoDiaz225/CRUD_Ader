@@ -29,33 +29,128 @@ if ($tableCheck->num_rows === 0) {
   die("<div class='container my-5'><div class='alert alert-danger'>Error: La tabla '$tabla' no existe.</div><a href='index.php' class='btn btn-link'><i class='bi bi-arrow-left'></i> Volver a entornos</a></div>");
 }
 
-// Guardar manualmente si es un formulario de carga manual (no CSV)
-if (
-  $_SERVER["REQUEST_METHOD"] === "POST" && 
-  isset($_POST["apellido_nombre"]) && 
-  !isset($_FILES['csvFile'])
-) {
-  $stmt = $conn->prepare("INSERT INTO `$tabla` (apellido_nombre, cuit_dni, razon_social, telefono, correo, rubro) VALUES (?, ?, ?, ?, ?, ?)");
-  $stmt->bind_param(
-    "ssssss",
-    $_POST["apellido_nombre"],
-    $_POST["cuit_dni"],
-    $_POST["razon_social"],
-    $_POST["telefono"],
-    $_POST["correo"],
-    $_POST["rubro"]
-  );
+// Al inicio del archivo, después de la conexión
+$stmt = $conn->prepare("SELECT * FROM entornos_campos 
+                       WHERE entorno_nombre = ? ORDER BY orden");
+$stmt->bind_param("s", $tabla);
+$stmt->execute();
+$campos = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
-  // Agregar esto para manejar la respuesta AJAX
-  if (isset($_POST['ajax'])) {
+// Guardar manualmente si es un formulario de carga manual (no CSV)
+if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_FILES['csvFile'])) {
     header('Content-Type: application/json');
-    if ($stmt->execute()) {
-      echo json_encode(['success' => true]);
-    } else {
-      echo json_encode(['success' => false, 'error' => "Error al guardar: " . $conn->error]);
+    
+    try {
+        $campos = [];
+        $valores = [];
+        $tipos = '';
+        $params = [];
+        $errores = [];
+
+        $stmt = $conn->prepare("SELECT nombre_campo, tipo_campo, es_requerido FROM entornos_campos 
+                              WHERE entorno_nombre = ? ORDER BY orden");
+        $stmt->bind_param("s", $tabla);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        while ($campo = $result->fetch_assoc()) {
+            $nombre = $campo['nombre_campo'];
+            $valor = $_POST[$nombre] ?? null;
+
+            // Validar campo requerido
+            if ($campo['es_requerido'] && ($valor === null || trim($valor) === '')) {
+                $errores[] = "El campo {$nombre} es requerido";
+                continue;
+            }
+
+            // Validar según tipo
+            switch ($campo['tipo_campo']) {
+                case 'numero':
+                    if ($valor !== null && $valor !== '' && !is_numeric($valor)) {
+                        $errores[] = "El campo {$nombre} debe ser numérico";
+                        $tipos .= 'i';
+                        break;
+                    }
+                    $tipos .= 'i';
+                    break;
+                    
+                case 'email':
+                    if ($valor !== null && $valor !== '' && !filter_var($valor, FILTER_VALIDATE_EMAIL)) {
+                        $errores[] = "El campo {$nombre} debe ser un email válido";
+                        $tipos .= 's';
+                        break;
+                    }
+                    $tipos .= 's';
+                    break;
+
+                case 'fecha':
+                    if ($valor !== null && $valor !== '') {
+                        $fecha = DateTime::createFromFormat('Y-m-d', $valor);
+                        if (!$fecha || $fecha->format('Y-m-d') !== $valor) {
+                            $errores[] = "El campo {$nombre} debe ser una fecha válida";
+                            $tipos .= 's';
+                            break;
+                        }
+                    }
+                    $tipos .= 's';
+                    break;
+
+                case 'telefono':
+                    if ($valor !== null && $valor !== '' && !preg_match('/^[0-9]{9,15}$/', $valor)) {
+                        $errores[] = "El campo {$nombre} debe ser un teléfono válido (9-15 dígitos)";
+                        $tipos .= 's';
+                        break;
+                    }
+                    $tipos .= 's';
+                    break;
+
+                default:
+                    if ($valor !== null && strlen($valor) > 255) {
+                        $errores[] = "El campo {$nombre} no puede exceder 255 caracteres";
+                        $tipos .= 's';
+                        break;
+                    }
+                    $tipos .= 's';
+                    break;
+            }
+
+            if ($valor !== null && $valor !== '') {
+                $campos[] = $nombre;
+                $valores[] = '?';
+                $params[] = $valor;
+            }
+        }
+
+        if (!empty($errores)) {
+            throw new Exception(implode('. ', $errores));
+        }
+
+        if (empty($campos)) {
+            throw new Exception('No se recibieron datos válidos');
+        }
+
+        $sql = sprintf(
+            "INSERT INTO `%s` (%s) VALUES (%s)",
+            $tabla,
+            implode(', ', $campos),
+            implode(', ', $valores)
+        );
+
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param($tipos, ...$params);
+        
+        if ($stmt->execute()) {
+            echo json_encode(['success' => true]);
+        } else {
+            throw new Exception($conn->error);
+        }
+    } catch (Exception $e) {
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
     }
     exit;
-  }
 }
 
 ?>
@@ -87,27 +182,61 @@ if (
   <div class="card mb-4 bg-dark text-light border-0">
     <div class="card-body">
       <h5 class="card-title text-center mb-3">Agregar registro manualmente</h5>
-      <form id="manualForm" autocomplete="off" class="row g-3">
-        <div class="col-md-6">
-          <input type="text" name="apellido_nombre" class="form-control" placeholder="Apellido y Nombre" required>
-        </div>
-        <div class="col-md-6">
-          <input type="text" name="cuit_dni" class="form-control" placeholder="CUIT o DNI" required>
-        </div>
-        <div class="col-md-6">
-          <input type="text" name="razon_social" class="form-control" placeholder="Razón Social" required>
-        </div>
-        <div class="col-md-6">
-          <input type="text" name="telefono" class="form-control" placeholder="Teléfono" required>
-        </div>
-        <div class="col-md-6">
-          <input type="email" name="correo" class="form-control" placeholder="Correo Electrónico" required>
-        </div>
-        <div class="col-md-6">
-          <input type="text" name="rubro" class="form-control" placeholder="Rubro" required>
-        </div>
-        <div class="col-12 text-end">
-          <button type="submit" class="btn btn-success"><i class="bi bi-save"></i> Guardar</button>
+      <form id="manualForm" class="row g-3">
+        <?php foreach ($campos as $campo): ?>
+            <div class="col-md-6">
+                <label class="form-label"><?= htmlspecialchars($campo['nombre_campo']) ?></label>
+                <?php if ($campo['tipo_campo'] === 'numero'): ?>
+                    <input type="number" 
+                           name="<?= htmlspecialchars($campo['nombre_campo']) ?>" 
+                           class="form-control"
+                           min="0"
+                           max="999999999"
+                           step="any"
+                           <?= $campo['es_requerido'] ? 'required' : '' ?>
+                           oninput="this.value = this.value.replace(/[^0-9.-]/g, '')">
+
+                <?php elseif ($campo['tipo_campo'] === 'email'): ?>
+                    <input type="email" 
+                           name="<?= htmlspecialchars($campo['nombre_campo']) ?>" 
+                           class="form-control"
+                           pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$"
+                           maxlength="100"
+                           <?= $campo['es_requerido'] ? 'required' : '' ?>>
+
+                <?php elseif ($campo['tipo_campo'] === 'fecha'): ?>
+                    <input type="date" 
+                           name="<?= htmlspecialchars($campo['nombre_campo']) ?>" 
+                           class="form-control"
+                           min="1900-01-01"
+                           max="2100-12-31"
+                           <?= $campo['es_requerido'] ? 'required' : '' ?>>
+
+                <?php elseif ($campo['tipo_campo'] === 'telefono'): ?>
+                    <input type="tel" 
+                           name="<?= htmlspecialchars($campo['nombre_campo']) ?>" 
+                           class="form-control"
+                           pattern="[0-9]{9,15}"
+                           maxlength="15"
+                           title="Ingrese un número de teléfono válido (9-15 dígitos)"
+                           <?= $campo['es_requerido'] ? 'required' : '' ?>>
+
+                <?php else: ?>
+                    <input type="text" 
+                           name="<?= htmlspecialchars($campo['nombre_campo']) ?>" 
+                           class="form-control"
+                           maxlength="255"
+                           pattern="[A-Za-z0-9\s\-_.,]*"
+                           title="Solo se permiten letras, números y algunos caracteres especiales"
+                           <?= $campo['es_requerido'] ? 'required' : '' ?>>
+                <?php endif; ?>
+                <div class="invalid-feedback">
+                    Por favor ingrese un valor válido para <?= htmlspecialchars($campo['nombre_campo']) ?>
+                </div>
+            </div>
+        <?php endforeach; ?>
+        <div class="col-12">
+            <button type="submit" class="btn btn-success">Guardar</button>
         </div>
       </form>
     </div>
@@ -127,7 +256,12 @@ if (
       </div>
     </form>
     <p class="mt-2 mb-0" style="font-size: 0.95em; color: #ffc107;">
-      El CSV debe tener los campos: Apellido y Nombre, CUIT/DNI, Razón Social, Teléfono, Correo, Rubro.
+      El CSV debe tener los campos: <?php 
+    $campos_lista = array_map(function($campo) {
+        return htmlspecialchars($campo['nombre_campo']);
+    }, $campos);
+    echo implode(', ', $campos_lista);
+    ?>.
     </p>
   </div>
 </div>
@@ -147,35 +281,21 @@ if (
   <!-- Tabla de registros -->
   <div class="table-responsive">
     <table class="table table-striped align-middle bg-dark text-light">
-      <thead class="table-success">
-        <tr>
-          <th>Apellido y Nombre</th>
-          <th>CUIT o DNI</th>
-          <th>Razón Social</th>
-          <th>Teléfono</th>
-          <th>Correo</th>
-          <th>Rubro</th>
-          <?php if (
-          (isset($_SESSION['puede_editar_registros']) && $_SESSION['puede_editar_registros']) ||
-          (isset($_SESSION['puede_eliminar_registros']) && $_SESSION['puede_eliminar_registros'])
-        ): ?>
-          <th>Acciones</th>
-        <?php endif; ?>
-      </tr>
-    </thead>
-    <tbody id="userTableBody">
-      <tr>
-        <td colspan="<?=
-          6 + (
-            (isset($_SESSION['puede_editar_registros']) && $_SESSION['puede_editar_registros']) ||
-            (isset($_SESSION['puede_eliminar_registros']) && $_SESSION['puede_eliminar_registros'])
-            ? 1 : 0
-          )
-        ?>" class="text-center">Cargando datos...</td>
-      </tr>
-    </tbody>
-  </table>
-</div>
+        <thead class="table-success">
+            <tr>
+                <?php foreach ($campos as $campo): ?>
+                    <th><?= htmlspecialchars($campo['nombre_campo']) ?></th>
+                <?php endforeach; ?>
+                <?php if ($_SESSION['puede_editar_registros'] || $_SESSION['puede_eliminar_registros']): ?>
+                    <th>Acciones</th>
+                <?php endif; ?>
+            </tr>
+        </thead>
+        <tbody id="userTableBody">
+            <!-- Los datos se cargarán dinámicamente -->
+        </tbody>
+    </table>
+  </div>
   <div class="pagination-container d-flex justify-content-end">
     <div id="pagination-controls" class="mt-3"></div>
   </div>
@@ -194,12 +314,36 @@ if (
           <input type="hidden" name="id" id="edit_id">
           <input type="hidden" name="tabla" id="edit_tabla" value="<?= htmlspecialchars($tabla) ?>">
           <div class="mb-2">
-            <input type="text" name="apellido_nombre" id="edit_apellido_nombre" class="form-control mb-2" placeholder="Apellido y Nombre" required>
-            <input type="text" name="cuit_dni" id="edit_cuit_dni" class="form-control mb-2" placeholder="CUIT o DNI" required>
-            <input type="text" name="razon_social" id="edit_razon_social" class="form-control mb-2" placeholder="Razón Social" required>
-            <input type="text" name="telefono" id="edit_telefono" class="form-control mb-2" placeholder="Teléfono" required>
-            <input type="email" name="correo" id="edit_correo" class="form-control mb-2" placeholder="Correo Electrónico" required>
-            <input type="text" name="rubro" id="edit_rubro" class="form-control mb-2" placeholder="Rubro" required>
+            <?php foreach ($campos as $campo): ?>
+              <?php if ($campo['tipo_campo'] === 'numero'): ?>
+                <input type="number" 
+                       name="<?= htmlspecialchars($campo['nombre_campo']) ?>" 
+                       id="edit_<?= htmlspecialchars($campo['nombre_campo']) ?>"
+                       class="form-control mb-2" 
+                       placeholder="<?= htmlspecialchars($campo['nombre_campo']) ?>"
+                       <?= $campo['es_requerido'] ? 'required' : '' ?>>
+              <?php elseif ($campo['tipo_campo'] === 'email'): ?>
+                <input type="email" 
+                       name="<?= htmlspecialchars($campo['nombre_campo']) ?>" 
+                       id="edit_<?= htmlspecialchars($campo['nombre_campo']) ?>"
+                       class="form-control mb-2" 
+                       placeholder="<?= htmlspecialchars($campo['nombre_campo']) ?>"
+                       <?= $campo['es_requerido'] ? 'required' : '' ?>>
+              <?php elseif ($campo['tipo_campo'] === 'fecha'): ?>
+                <input type="date" 
+                       name="<?= htmlspecialchars($campo['nombre_campo']) ?>" 
+                       id="edit_<?= htmlspecialchars($campo['nombre_campo']) ?>"
+                       class="form-control mb-2" 
+                       <?= $campo['es_requerido'] ? 'required' : '' ?>>
+              <?php else: ?>
+                <input type="text" 
+                       name="<?= htmlspecialchars($campo['nombre_campo']) ?>" 
+                       id="edit_<?= htmlspecialchars($campo['nombre_campo']) ?>"
+                       class="form-control mb-2" 
+                       placeholder="<?= htmlspecialchars($campo['nombre_campo']) ?>"
+                       <?= $campo['es_requerido'] ? 'required' : '' ?>>
+              <?php endif; ?>
+            <?php endforeach; ?>
           </div>
         </div>
         <div class="modal-footer border-0">

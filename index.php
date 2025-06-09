@@ -96,9 +96,12 @@ $result = $conn->query("SELECT * FROM entornos ORDER BY fecha_creacion DESC");
     </div>
     <div class="flex-grow-1 d-flex flex-column">
       <div class="d-grid gap-3">
-        <?php if (esadmin()) { ?>
+        <?php if ($_SESSION['rol'] === 'admin') { ?>
           <button type="button" class="sidebar-btn sidebar-btn-green" data-bs-toggle="modal" data-bs-target="#crearUsuarioModal">
             <i class="bi bi-person-plus me-2"></i> Crear usuario
+          </button>
+          <button type="button" class="sidebar-btn sidebar-btn-green" data-bs-toggle="modal" data-bs-target="#gestionUsuariosModal">
+            <i class="bi bi-people me-2"></i> Gestionar usuarios
           </button>
         <?php } ?>
         <form action="logout.php" method="POST" class="m-0">
@@ -206,18 +209,49 @@ $result = $conn->query("SELECT * FROM entornos ORDER BY fecha_creacion DESC");
 
 <h1 class="text-center my-4">Gestión de Entornos</h1>
 
-<?php if ($_SESSION['puede_crear_entorno']) { ?>
-  <div class="row justify-content-center mb-4">
-    <div class="col-12 col-md-8 col-lg-6">
-      <form action="environments/create_environment.php" method="POST" class="card card-body shadow-sm bg-dark text-light border-0">
-        <div class="input-group">
-          <input type="text" name="nombre" class="form-control" placeholder="Nombre del entorno" required>
-          <button type="submit" class="btn btn-success">Crear Entorno</button>
-        </div>
-      </form>
+<?php if (isset($_SESSION['puede_crear_entorno']) && $_SESSION['puede_crear_entorno']): ?>
+<div class="modal fade" id="crearEntornoModal">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content bg-dark text-light">
+      <div class="modal-header border-0">
+        <h5 class="modal-title">Crear Nuevo Entorno</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="crearEntornoForm">
+          <div class="mb-3">
+            <label class="form-label">Nombre del entorno</label>
+            <input type="text" name="nombre" class="form-control" required>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label d-flex justify-content-between align-items-center">
+              <span>Campos de la tabla</span>
+              <button type="button" class="btn btn-sm btn-success" id="agregarCampo">
+                <i class="bi bi-plus-lg"></i> Agregar campo
+              </button>
+            </label>
+            <div id="camposContainer" class="border rounded p-3">
+              <!-- Los campos se agregarán aquí dinámicamente -->
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-success w-100">
+            <i class="bi bi-check-lg"></i> Crear entorno
+          </button>
+        </form>
+      </div>
     </div>
   </div>
-<?php } ?>
+</div>
+
+<!-- Agregar también el botón para abrir el modal -->
+<div class="text-center mb-4">
+  <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#crearEntornoModal">
+    <i class="bi bi-plus-lg"></i> Crear nuevo entorno
+  </button>
+</div>
+<?php endif; ?>
 
 <div class="row justify-content-center">
   <div class="col-12 col-md-10 col-lg-8">
@@ -297,7 +331,151 @@ $result = $conn->query("SELECT * FROM entornos ORDER BY fecha_creacion DESC");
   </div>
 </div>
 
+<!-- Modal de gestión de usuarios -->
+<div class="modal fade" id="gestionUsuariosModal" tabindex="-1" aria-labelledby="gestionUsuariosModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content bg-dark text-light">
+      <div class="modal-header border-0">
+        <h5 class="modal-title" id="gestionUsuariosModalLabel">Gestión de Usuarios</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="table-responsive">
+          <!-- Corregir el ID de la tabla aquí -->
+          <table class="table table-dark table-hover align-middle">
+            <thead class="table-success">
+              <tr>
+                <th>Usuario</th>
+                <th>Rol</th>
+                <th>Permisos</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="userTableBody">
+              <?php
+              $users_query = "SELECT * FROM usuarios WHERE id != {$_SESSION['user_id']}";
+              $users_result = $conn->query($users_query);
+              while ($user = $users_result->fetch_assoc()):
+              ?>
+                <tr>
+                  <td><?= htmlspecialchars($user['username']) ?></td>
+                  <td><?= htmlspecialchars($user['rol']) ?></td>
+                  <td>
+                    <small>
+                      <?php
+                      $permisos = [];
+                      if ($user['puede_crear_entorno']) $permisos[] = "Crear entornos";
+                      if ($user['puede_eliminar_entorno']) $permisos[] = "Eliminar entornos";
+                      if ($user['puede_editar_entorno']) $permisos[] = "Editar entornos";
+                      if ($user['puede_editar_registros']) $permisos[] = "Editar registros";
+                      if ($user['puede_eliminar_registros']) $permisos[] = "Eliminar registros";
+                      echo htmlspecialchars(implode(", ", $permisos));
+                      ?>
+                    </small>
+                  </td>
+                  <td>
+                    <button type="button"
+                            class="btn btn-warning btn-sm me-1 edit-user-btn"
+                            data-bs-toggle="modal" 
+                            data-bs-target="#editarUsuarioModal"
+                            data-id="<?= $user['id'] ?>"
+                            data-username="<?= htmlspecialchars($user['username']) ?>"
+                            data-rol="<?= htmlspecialchars($user['rol']) ?>"
+                            data-entornos="<?= htmlspecialchars($user['entornos_asignados']) ?>"
+                            data-permisos='<?= json_encode([
+                                "puede_crear_entorno" => (int)$user['puede_crear_entorno'],
+                                "puede_eliminar_entorno" => (int)$user['puede_eliminar_entorno'],
+                                "puede_editar_entorno" => (int)$user['puede_editar_entorno'],
+                                "puede_editar_registros" => (int)$user['puede_editar_registros'],
+                                "puede_eliminar_registros" => (int)$user['puede_eliminar_registros']
+                            ]) ?>'>
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button type="button" 
+                            class="btn btn-danger btn-sm delete-user-btn"
+                            data-user-id="<?= $user['id'] ?>"
+                            data-username="<?= htmlspecialchars($user['username']) ?>">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+              <?php endwhile; ?>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de edición de usuario -->
+<div class="modal fade" id="editarUsuarioModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark text-light">
+            <form id="editarUsuarioForm">
+                <div class="modal-header border-0">
+                    <h5 class="modal-title">Editar Usuario</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="edit_user_id" name="user_id">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Usuario</label>
+                            <input type="text" id="edit_username" class="form-control bg-dark text-light" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Rol</label>
+                            <select id="edit_rol" name="rol" class="form-select bg-dark text-light border-secondary">
+                                <option value="user">Usuario</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <label class="form-label">Permisos</label>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="form-check mb-2">
+                                        <input type="checkbox" class="form-check-input" id="edit_puede_crear_entorno" name="puede_crear_entorno" value="1">
+                                        <label class="form-check-label" for="edit_puede_crear_entorno">Crear entornos</label>
+                                    </div>
+                                    <div class="form-check mb-2">
+                                        <input type="checkbox" class="form-check-input" id="edit_puede_eliminar_entorno" name="puede_eliminar_entorno" value="1">
+                                        <label class="form-check-label" for="edit_puede_eliminar_entorno">Eliminar entornos</label>
+                                    </div>
+                                    <div class="form-check mb-2">
+                                        <input type="checkbox" class="form-check-input" id="edit_puede_editar_entorno" name="puede_editar_entorno" value="1">
+                                        <label class="form-check-label" for="edit_puede_editar_entorno">Editar entornos</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check mb-2">
+                                        <input type="checkbox" class="form-check-input" id="edit_puede_editar_registros" name="puede_editar_registros" value="1">
+                                        <label class="form-check-label" for="edit_puede_editar_registros">Editar registros</label>
+                                    </div>
+                                    <div class="form-check mb-2">
+                                        <input type="checkbox" class="form-check-input" id="edit_puede_eliminar_registros" name="puede_eliminar_registros" value="1">
+                                        <label class="form-check-label" for="edit_puede_eliminar_registros">Eliminar registros</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="bi bi-save"></i> Guardar cambios
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script src="js/script.js"></script>
+<script src="js/entorno-campos.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
