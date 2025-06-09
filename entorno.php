@@ -29,7 +29,7 @@ if ($tableCheck->num_rows === 0) {
   die("<div class='container my-5'><div class='alert alert-danger'>Error: La tabla '$tabla' no existe.</div><a href='index.php' class='btn btn-link'><i class='bi bi-arrow-left'></i> Volver a entornos</a></div>");
 }
 
-// Al inicio del archivo, después de la conexión
+
 $stmt = $conn->prepare("SELECT * FROM entornos_campos 
                        WHERE entorno_nombre = ? ORDER BY orden");
 $stmt->bind_param("s", $tabla);
@@ -351,6 +351,31 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_FILES['csvFile'])) {
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
         </div>
       </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para confirmar eliminación de registro -->
+<div class="modal fade" id="deleteRecordModal" tabindex="-1" aria-labelledby="deleteRecordModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content bg-dark text-light">
+      <div class="modal-header border-0">
+        <h5 class="modal-title" id="deleteRecordModalLabel">Confirmar eliminación</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        ¿Está seguro que desea eliminar este registro?
+        <p class="text-danger mt-2 mb-0">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>
+          Esta acción no se puede deshacer
+        </p>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-danger" id="confirmDeleteRecord">
+          <i class="bi bi-trash me-2"></i>Eliminar
+        </button>
+      </div>
     </div>
   </div>
 </div>

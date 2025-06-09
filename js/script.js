@@ -360,25 +360,32 @@ function handleEnvironmentEdit(event) {
 
 // Manejador para el botón de eliminar
   function handleDelete() {
-  const tr = this.closest("tr");
-  const id = tr.dataset.id;
-
-  if (confirm("¿Seguro que desea eliminar este registro?")) {
-    fetch(`environments/delete_from_environment.php?tabla=${tabla}&id=${id}`)
-      .then(res => {
-        if (!res.ok) {
-          throw new Error(`Error HTTP: ${res.status}`);
-        }
-        return res.text();
-      })
-      .then(msg => {
-        showFloatingMessage(msg); // Mostrar mensaje flotante
-        loadUsers(); // Recargar la tabla inmediatamente
-      })
-      .catch(error => {
-        showFloatingMessage("Error al eliminar: " + error.message, true);
-      });
-  }
+    const tr = this.closest("tr");
+    const id = tr.dataset.id;
+    
+    // Mostrar el modal de confirmación
+    const modal = new bootstrap.Modal(document.getElementById('deleteRecordModal'));
+    modal.show();
+    
+    // Configurar el botón de confirmación
+    document.getElementById('confirmDeleteRecord').onclick = function() {
+        fetch(`environments/delete_from_environment.php?tabla=${tabla}&id=${id}`)
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error(`Error HTTP: ${res.status}`);
+                }
+                return res.text();
+            })
+            .then(msg => {
+                showFloatingMessage(msg);
+                loadUsers();
+                modal.hide();
+            })
+            .catch(error => {
+                showFloatingMessage("Error al eliminar: " + error.message, true);
+                modal.hide();
+            });
+    };
 }
 
 
@@ -630,12 +637,21 @@ function initializeUserManagement() {
     }
 
     // Manejador para botones de eliminar usuario
-    document.querySelectorAll('.delete-user-btn').forEach(btn => {
+   document.querySelectorAll('.delete-user-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const userId = this.getAttribute('data-user-id');
             const username = this.getAttribute('data-username');
             
-            if (confirm(`¿Está seguro que desea eliminar al usuario "${username}"?`)) {
+            // Actualizar el modal con la información del usuario
+            const userSpan = document.getElementById('userToDelete');
+            userSpan.textContent = username;
+            
+            // Mostrar el modal
+            const modal = new bootstrap.Modal(document.getElementById('deleteUserModal'));
+            modal.show();
+            
+            // Configurar el botón de confirmación
+            document.getElementById('confirmDeleteUser').onclick = function() {
                 const formData = new FormData();
                 formData.append('user_id', userId);
 
@@ -647,15 +663,17 @@ function initializeUserManagement() {
                 .then(data => {
                     if (data.success) {
                         showFloatingMessage('Usuario eliminado correctamente');
-                        this.closest('tr').remove();
+                        btn.closest('tr').remove();
+                        modal.hide();
                     } else {
                         throw new Error(data.error || 'Error al eliminar usuario');
                     }
                 })
                 .catch(error => {
                     showFloatingMessage(error.message, true);
+                    modal.hide();
                 });
-            }
+            };
         });
     });
 }
