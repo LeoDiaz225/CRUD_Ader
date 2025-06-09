@@ -9,20 +9,27 @@ $offset = ($page - 1) * $limit;
 $search = trim($_GET['search'] ?? '');
 
 // Obtener campos
-$stmt = $conn->prepare("SELECT nombre_campo FROM entornos_campos 
+$stmt = $conn->prepare("SELECT nombre_campo, tipo_campo FROM entornos_campos 
                        WHERE entorno_nombre = ? ORDER BY orden");
 $stmt->bind_param("s", $tabla);
 $stmt->execute();
 $result = $stmt->get_result();
 $campos = [];
-while ($row = $result->fetch_assoc()) {
-    $campos[] = $row['nombre_campo'];
+$primer_campo_texto = '';
+
+while ($campo = $result->fetch_assoc()) {
+    $campos[] = $campo['nombre_campo'];
+    // Guardar el primer campo de tipo texto para ordenamiento
+    if (empty($primer_campo_texto) && $campo['tipo_campo'] === 'texto') {
+        $primer_campo_texto = $campo['nombre_campo'];
+    }
 }
 
-// Construir consulta
+// Construir consulta base
 $fields = empty($campos) ? '*' : 'id, ' . implode(', ', $campos);
 $sql = "SELECT $fields FROM `$tabla`";
 
+// Agregar WHERE si hay búsqueda
 if ($search !== "") {
     $whereParts = [];
     $params = [];
@@ -39,19 +46,15 @@ if ($search !== "") {
     }
 }
 
-// Contar total
-$countSql = "SELECT COUNT(*) as total FROM `$tabla`" . 
-            (!empty($whereParts) ? " WHERE " . implode(" OR ", $whereParts) : "");
-
-$stmt = $conn->prepare($countSql);
-if (!empty($params)) {
-    $stmt->bind_param($types, ...$params);
+// Agregar ORDER BY antes del LIMIT
+if (!empty($primer_campo_texto)) {
+    $sql .= " ORDER BY `$primer_campo_texto` ASC";
 }
-$stmt->execute();
-$total = $stmt->get_result()->fetch_assoc()['total'];
 
-// Obtener registros
+// Agregar LIMIT después del ORDER BY
 $sql .= " LIMIT ? OFFSET ?";
+
+// Preparar y ejecutar la consulta
 $stmt = $conn->prepare($sql);
 
 if (!empty($params)) {
@@ -66,6 +69,18 @@ if (!empty($params)) {
 $stmt->execute();
 $result = $stmt->get_result();
 $data = $result->fetch_all(MYSQLI_ASSOC);
+
+// Contar total
+$countSql = "SELECT COUNT(*) as total FROM `$tabla`" . 
+            (!empty($whereParts) ? " WHERE " . implode(" OR ", $whereParts) : "");
+
+$stmt = $conn->prepare($countSql);
+if (!empty($params)) {
+    $stmt->bind_param($types, ...$params);
+}
+$stmt->execute();
+$total = $stmt->get_result()->fetch_assoc()['total'];
+
 
 echo json_encode([
     'data' => $data,

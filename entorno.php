@@ -29,7 +29,7 @@ if ($tableCheck->num_rows === 0) {
   die("<div class='container my-5'><div class='alert alert-danger'>Error: La tabla '$tabla' no existe.</div><a href='index.php' class='btn btn-link'><i class='bi bi-arrow-left'></i> Volver a entornos</a></div>");
 }
 
-// Al inicio del archivo, después de la conexión
+
 $stmt = $conn->prepare("SELECT * FROM entornos_campos 
                        WHERE entorno_nombre = ? ORDER BY orden");
 $stmt->bind_param("s", $tabla);
