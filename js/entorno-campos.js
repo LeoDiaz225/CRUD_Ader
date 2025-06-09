@@ -2,8 +2,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const camposContainer = document.getElementById('camposContainer');
     const agregarCampoBtn = document.getElementById('agregarCampo');
     const crearEntornoForm = document.getElementById('crearEntornoForm');
+    const csrf_token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
-    if (!camposContainer || !agregarCampoBtn || !crearEntornoForm) return;
+    if (!camposContainer || !agregarCampoBtn || !crearEntornoForm) {
+        console.error('No se encontraron elementos necesarios');
+        return;
+    }
 
     function crearCampo() {
         const campoId = `campo_${Date.now()}`;
@@ -61,12 +65,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         try {
-            const response = await fetch('environments/create_environment.php', {
+            const response = await fetchWithCSRF('environments/create_environment.php', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrf_token
+                },
                 body: JSON.stringify({
                     nombre: crearEntornoForm.nombre.value,
-                    campos: campos
+                    campos: campos,
+                    csrf_token: csrf_token
                 })
             });
             
@@ -74,10 +82,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.success) {
                 location.reload();
             } else {
-                showFloatingMessage(data.error || 'Error al crear entorno', true);
+                throw new Error(data.error || 'Error al crear entorno');
             }
         } catch (error) {
-            showFloatingMessage('Error de conexión', true);
+            showFloatingMessage('Error: ' + error.message, true);
         }
     });
 });

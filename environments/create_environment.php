@@ -1,7 +1,27 @@
 <?php
 session_start();
 include "../includes/Security.php";
+
+function validarSesion() {
+    if (!isset($_SESSION['user_id'])) {
+        http_response_code(401);
+        die(json_encode(['error' => 'Sesión no válida']));
+    }
+}
+
 validarSesion();
+
+// Validar CSRF
+if (!isset($_POST['csrf_token']) && !isset($_SERVER['HTTP_X_CSRF_TOKEN'])) {
+    http_response_code(403);
+    die(json_encode(['error' => 'Token CSRF no proporcionado']));
+}
+
+$token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'];
+if (!Security::validateCSRFToken($token)) {
+    http_response_code(403);
+    die(json_encode(['error' => 'Token CSRF inválido']));
+}
 
 // Agregar validación CSRF y Rate Limiting
 if (!isset($_POST['csrf_token']) || !Security::validateCSRFToken($_POST['csrf_token'])) {

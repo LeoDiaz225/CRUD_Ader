@@ -4,14 +4,48 @@ function getCSRFToken() {
 
 // Función wrapper para fetch con CSRF
 async function fetchWithCSRF(url, options = {}) {
-    const csrfToken = getCSRFToken();
-    const defaultOptions = {
-        headers: {
-            'X-CSRF-TOKEN': csrfToken
-        }
-    };
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
     
-    return fetch(url, { ...defaultOptions, ...options });
+    if (!csrfToken) {
+        throw new Error('CSRF token not found');
+    }
+
+    // Si es FormData, agregar el token
+    if (options.body instanceof FormData) {
+        options.body.append('csrf_token', csrfToken);
+    } else if (typeof options.body === 'string') {
+        // Si es JSON string, parsearlo, agregar token y volver a stringificar
+        try {
+            const bodyData = JSON.parse(options.body);
+            bodyData.csrf_token = csrfToken;
+            options.body = JSON.stringify(bodyData);
+        } catch (e) {
+            // Si no es JSON, dejarlo como está
+        }
+    }
+
+    const defaultHeaders = {
+        'X-CSRF-TOKEN': csrfToken
+    };
+
+    if (!(options.body instanceof FormData)) {
+        defaultHeaders['Content-Type'] = 'application/json';
+    }
+
+    options.headers = { ...defaultHeaders, ...options.headers };
+    
+    try {
+        const response = await fetch(url, options);
+        if (!response.ok) {
+            const text = await response.text();
+            console.error('Response error:', text);
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response;
+    } catch (error) {
+        console.error('Fetch error:', error);
+        throw error;
+    }
 }
 
 function showFloatingMessage(msg, isError = false) {
@@ -125,55 +159,59 @@ if (csvForm) {
     paginationControls: !!paginationControls // Nuevo
   });
 
-  function loadUsers(page = 1) { // Modificado para aceptar la página
-    if (!tabla || !userTableBody) {
-      console.error("No se puede cargar usuarios: falta tabla o contenedor");
+async function loadUsers(page = 1) {
+    try {
+        const url = new URL('environments/read.php', window.location.origin);
+        url.searchParams.set('tabla', tabla);
+        url.searchParams.set('page', page);
+        url.searchParams.set('limit', itemsPerPage);
+        url.searchParams.set('csrf_token', getCSRFToken());
+        
+        if (searchTerm?.trim()) {
+            url.searchParams.set('search', searchTerm.trim());
+        }
+
+        const response = await fetchWithCSRF(url.toString());
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+
+        updateTable(data);
+    } catch (error) {
+        console.error('Error:', error);
+        showFloatingMessage('Error al cargar datos: ' + error.message, true);
+    }
+}
+
+  function updateTable(data) {
+    const { registros, total } = data;
+    
+    userTableBody.innerHTML = ""; // Limpiamos la tabla
+
+    if (!Array.isArray(registros)) {
+      console.error("Los datos recibidos no son un array:", registros);
+      userTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center">Error: los datos recibidos no son válidos</td></tr>';
+      updatePaginationControls(0, currentPage, itemsPerPage);
       return;
     }
-    currentPage = page;
-    console.log(`Intentando cargar usuarios para tabla: ${tabla}, página: ${page}, límite: ${itemsPerPage}`);
-    
-    let url = `environments/read.php?tabla=${tabla}&page=${page}&limit=${itemsPerPage}`;
-    if (searchTerm && searchTerm.trim() !== "") {
-      url += `&search=${encodeURIComponent(searchTerm.trim())}`;
+
+    if (registros.length === 0 && currentPage === 1) {
+      console.log("No hay registros para mostrar");
+      const emptyRow = document.createElement("tr");
+      emptyRow.innerHTML = '<td colspan="7" style="text-align: center">No hay registros disponibles</td>';
+      userTableBody.appendChild(emptyRow);
+      updatePaginationControls(0, currentPage, itemsPerPage);
+      return;
+    } else if (registros.length === 0 && currentPage > 1) {
+      // Esto podría pasar si se navega a una página que ya no tiene datos (ej. después de eliminar)
+      console.log("No hay registros en esta página, volviendo a la primera.");
+      loadUsers(1); // Cargar la primera página
+      return;
     }
-    fetchWithCSRF(url)
 
-      .then(res => {
-        if (!res.ok) {
-          throw new Error(`Error HTTP: ${res.status}`);
-        }
-        return res.json();
-      })
-      .then(response => { // Modificado para manejar la nueva estructura de respuesta
-        console.log("Datos recibidos:", response);
-        const data = response.data;
-        const totalItems = response.total;
-        
-        userTableBody.innerHTML = ""; // Limpiamos la tabla
-
-        if (!Array.isArray(data)) {
-          console.error("Los datos recibidos no son un array:", data);
-          userTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center">Error: los datos recibidos no son válidos</td></tr>';
-          updatePaginationControls(0, page, itemsPerPage);
-          return;
-        }
-
-        if (data.length === 0 && page === 1) {
-          console.log("No hay registros para mostrar");
-          const emptyRow = document.createElement("tr");
-          emptyRow.innerHTML = '<td colspan="7" style="text-align: center">No hay registros disponibles</td>';
-          userTableBody.appendChild(emptyRow);
-          updatePaginationControls(0, page, itemsPerPage);
-          return;
-        } else if (data.length === 0 && page > 1) {
-          // Esto podría pasar si se navega a una página que ya no tiene datos (ej. después de eliminar)
-          console.log("No hay registros en esta página, volviendo a la primera.");
-          loadUsers(1); // Cargar la primera página
-          return;
-        }
-
-data.forEach(user => {
+registros.forEach(user => {
     const row = document.createElement("tr");
     row.setAttribute("data-id", user.id);
 
@@ -214,20 +252,10 @@ data.forEach(user => {
     userTableBody.appendChild(row);
 });
 
-        // Activamos los botones de edición y eliminación
-        activarBotones();
-        // Actualizamos los controles de paginación
-        updatePaginationControls(totalItems, page, itemsPerPage);
-      })
-      .catch(error => {
-        console.error("Error al cargar datos:", error);
-        if (userTableBody) {
-          userTableBody.innerHTML = `<tr><td colspan="7" style="color: red; text-align: center">
-            Error al cargar datos: ${error.message}</td></tr>`;
-        }
-        updatePaginationControls(0, currentPage, itemsPerPage); // Limpiar controles en caso de error
-      });
-  }
+// Activamos los botones de edición y eliminación
+activarBotones();
+updatePaginationControls(total, currentPage, itemsPerPage);
+}
 
   function updatePaginationControls(totalItems, currentPage, itemsPerPage) {
     if (!paginationControls) return;
@@ -600,31 +628,49 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Función para inicializar la gestión de usuarios
 function initializeUserManagement() {
-    // Manejador para botones de edición
-    document.querySelectorAll('.edit-user-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const userId = this.getAttribute('data-id');
-            const username = this.getAttribute('data-username');
-            const rol = this.getAttribute('data-rol');
-            const permisos = JSON.parse(this.getAttribute('data-permisos'));
-            const entornos = this.getAttribute('data-entornos');
-            
-            // Llenar el formulario con los datos actuales
-            document.getElementById('edit_user_id').value = userId;
-            document.getElementById('edit_username').value = username;
-            document.getElementById('edit_rol').value = rol;
-            
-            // Actualizar checkboxes según los permisos
-            document.getElementById('edit_puede_crear_entorno').checked = permisos.puede_crear_entorno === 1;
-            document.getElementById('edit_puede_eliminar_entorno').checked = permisos.puede_eliminar_entorno === 1;
-            document.getElementById('edit_puede_editar_entorno').checked = permisos.puede_editar_entorno === 1;
-            document.getElementById('edit_puede_editar_registros').checked = permisos.puede_editar_registros === 1;
-            document.getElementById('edit_puede_eliminar_registros').checked = permisos.puede_eliminar_registros === 1;
-        });
-    });
-
-    // Manejador para el formulario de edición
+    const editButtons = document.querySelectorAll('.edit-user-btn');
+    const deleteButtons = document.querySelectorAll('.delete-user-btn');
     const editForm = document.getElementById('editarUsuarioForm');
+    const csrf_token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+    if (editButtons.length) {
+        editButtons.forEach(btn => {
+            btn.addEventListener('click', function() {
+                try {
+                    const userId = this.getAttribute('data-id');
+                    const username = this.getAttribute('data-username');
+                    const rol = this.getAttribute('data-rol');
+                    const permisos = JSON.parse(this.getAttribute('data-permisos') || '{}');
+                    
+                    if (!userId || !username) {
+                        throw new Error('Datos de usuario incompletos');
+                    }
+                    
+                    const form = document.getElementById('editarUsuarioForm');
+                    if (!form) {
+                        throw new Error('Formulario de edición no encontrado');
+                    }
+
+                    form.querySelector('input[name="user_id"]').value = userId;
+                    form.querySelector('input[name="username"]').value = username;
+                    form.querySelector('select[name="rol"]').value = rol;
+                    
+                    Object.keys(permisos).forEach(permiso => {
+                        const checkbox = form.querySelector(`input[name="${permiso}"]`);
+                        if (checkbox) {
+                            checkbox.checked = permisos[permiso];
+                        }
+                    });
+
+                } catch (error) {
+                    showFloatingMessage('Error: ' + error.message, true);
+                }
+            });
+        });
+    }
+
+    
+    // Manejador para el formulario de edición
     if (editForm) {
         editForm.addEventListener('submit', function(e) {
             e.preventDefault();

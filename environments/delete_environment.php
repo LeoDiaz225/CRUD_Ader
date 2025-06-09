@@ -1,5 +1,19 @@
 <?php
 session_start();
+
+function validarSesion() {
+    if (!isset($_SESSION['user_id']) || !isset($_SESSION['last_activity'])) {
+        header('Location: ../login.php');
+        exit;
+    }
+    if (time() - $_SESSION['last_activity'] > 1800) {
+        session_destroy();
+        header('Location: ../login.php?expired=1');
+        exit;
+    }
+    $_SESSION['last_activity'] = time();
+}
+
 include "../includes/Security.php";
 validarSesion();
 
@@ -43,3 +57,4 @@ try {
     Security::logAction($_SESSION['user_id'], 'delete_environment_error', $e->getMessage());
     die("Error: " . $e->getMessage());
 }
+

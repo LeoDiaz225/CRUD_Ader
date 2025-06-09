@@ -1,8 +1,8 @@
 <?php
 session_start();
 
-if ($_SERVER["REQUEST_METHOD"] === "POST" && (!isset($_POST['csrf_token']) || !Security::validateCSRFToken($_POST['csrf_token']))) {
-    die('Token CSRF inválido');
+if (!isset($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 // Headers de seguridad
 header("X-Content-Type-Options: nosniff");
@@ -210,6 +210,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_FILES['csvFile'])) {
     <div class="card-body">
       <h5 class="card-title text-center mb-3">Agregar registro manualmente</h5>
       <form id="manualForm" class="row g-3">
+            <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
         <?php foreach ($campos as $campo): ?>
             <div class="col-md-6">
                 <label class="form-label"><?= htmlspecialchars($campo['nombre_campo']) ?></label>
@@ -274,6 +275,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_FILES['csvFile'])) {
   <div class="card-body">
     <h5 class="card-title text-center mb-3">Importar CSV</h5>
     <form id="csvForm" class="row g-3 align-items-center">
+          <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
       <div class="col-md-8">
         <input type="file" id="csvFile" name="csvFile" accept=".csv" class="form-control" required>
         <input type="hidden" name="tabla" value="<?= htmlspecialchars($tabla) ?>">

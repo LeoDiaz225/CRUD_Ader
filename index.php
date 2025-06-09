@@ -1,5 +1,7 @@
 <?php
 session_start();
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
 // Headers de seguridad
 header("X-Content-Type-Options: nosniff");
@@ -15,11 +17,24 @@ function esadmin() {
       && isset($_SESSION['puede_editar_entorno']) && $_SESSION['puede_editar_entorno'];
 }
 
+// Agregar debugger para verificar los permisos
+$debug_admin = esadmin() ? 'true' : 'false';
+echo "<!-- Es admin: $debug_admin -->";
+
 if (!isset($_SESSION["user_id"])) {
     header("Location: login.php");
     exit;
 }
 include "includes/db.php";
+
+if ($conn->connect_error) {
+    die("Error de conexión: " . $conn->connect_error);
+}
+
+// Agrega esto después de la conexión para verificar que los datos de sesión están presentes
+echo "<!-- Debug info: ";
+print_r($_SESSION);
+echo " -->";
 
 if (esadmin() && isset($_POST['crear_usuario'])) {
   $username = trim($_POST['username'] ?? '');
@@ -76,6 +91,7 @@ $result = $conn->query("SELECT * FROM entornos ORDER BY fecha_creacion DESC");
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <meta name="csrf-token" content="<?= Security::generateCSRFToken() ?>">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Entornos de Trabajo</title>
   <link rel="stylesheet" href="css/style.css">
@@ -329,10 +345,11 @@ $result = $conn->query("SELECT * FROM entornos ORDER BY fecha_creacion DESC");
       <div class="modal-footer border-0">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
         <form id="deleteEnvironmentForm" action="environments/delete_environment.php" method="POST" class="d-inline m-0">
-          <input type="hidden" name="nombre" id="environmentNameInput">
-          <button type="submit" class="btn btn-danger">
-            <i class="bi bi-trash me-2"></i>Eliminar
-          </button>
+            <input type="hidden" name="nombre" id="environmentNameInput">
+            <input type="hidden" name="csrf_token" value="<?= Security::generateCSRFToken() ?>">
+            <button type="submit" class="btn btn-danger">
+                <i class="bi bi-trash me-2"></i>Eliminar
+            </button>
         </form>
       </div>
     </div>
@@ -383,20 +400,19 @@ $result = $conn->query("SELECT * FROM entornos ORDER BY fecha_creacion DESC");
                   </td>
                   <td>
                     <button type="button"
-                            class="btn btn-warning btn-sm me-1 edit-user-btn"
-                            data-bs-toggle="modal" 
-                            data-bs-target="#editarUsuarioModal"
-                            data-id="<?= $user['id'] ?>"
-                            data-username="<?= htmlspecialchars($user['username']) ?>"
-                            data-rol="<?= htmlspecialchars($user['rol']) ?>"
-                            data-entornos="<?= htmlspecialchars($user['entornos_asignados']) ?>"
-                            data-permisos='<?= json_encode([
-                                "puede_crear_entorno" => (int)$user['puede_crear_entorno'],
-                                "puede_eliminar_entorno" => (int)$user['puede_eliminar_entorno'],
-                                "puede_editar_entorno" => (int)$user['puede_editar_entorno'],
-                                "puede_editar_registros" => (int)$user['puede_editar_registros'],
-                                "puede_eliminar_registros" => (int)$user['puede_eliminar_registros']
-                            ]) ?>'>
+                      class="btn btn-warning btn-sm me-1 edit-user-btn"
+                      data-bs-toggle="modal" 
+                      data-bs-target="#editarUsuarioModal"
+                      data-id="<?= htmlspecialchars($user['id']) ?>"
+                      data-username="<?= htmlspecialchars($user['username']) ?>"
+                      data-rol="<?= htmlspecialchars($user['rol']) ?>"
+                      data-permisos='<?= json_encode([
+                      "puede_crear_entorno" => (bool)$user['puede_crear_entorno'],
+                      "puede_eliminar_entorno" => (bool)$user['puede_eliminar_entorno'],
+                      "puede_editar_entorno" => (bool)$user['puede_editar_entorno'],
+                      "puede_editar_registros" => (bool)$user['puede_editar_registros'],
+                      "puede_eliminar_registros" => (bool)$user['puede_eliminar_registros']
+                        ]) ?>'>
                       <i class="bi bi-pencil"></i>
                     </button>
                     <button type="button" 
