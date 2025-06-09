@@ -474,6 +474,31 @@ $result = $conn->query("SELECT * FROM entornos ORDER BY fecha_creacion DESC");
     </div>
 </div>
 
+<!-- Modal para confirmar eliminación de usuario -->
+<div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content bg-dark text-light">
+      <div class="modal-header border-0">
+        <h5 class="modal-title" id="deleteUserModalLabel">Confirmar eliminación</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        ¿Está seguro que desea eliminar al usuario "<span id="userToDelete"></span>"?
+        <p class="text-danger mt-2 mb-0">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>
+          Esta acción no se puede deshacer
+        </p>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-danger" id="confirmDeleteUser">
+          <i class="bi bi-trash me-2"></i>Eliminar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="js/script.js"></script>
 <script src="js/entorno-campos.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
